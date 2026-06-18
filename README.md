@@ -35,6 +35,19 @@ http://127.0.0.1:4173/
 
 You can also serve it with any static-file server.
 
+## Platform Support
+
+ParticleLife is not macOS-only. It is a static browser app and should run on any operating system with a modern browser that supports WebGL2 and floating-point render targets.
+
+Supported targets include:
+
+- macOS with Chrome, Edge, Firefox, or recent Safari versions.
+- Windows with Chrome, Edge, or Firefox.
+- Linux with Chrome, Chromium, or Firefox.
+- Some Android browsers, depending on browser and GPU WebGL2 support.
+
+The local run command uses Python's built-in static server, but any static-file server works. You can host ParticleLife on GitHub Pages, Netlify, Vercel, nginx, Apache, or any equivalent static hosting service.
+
 ## Controls
 
 - `Particles`: number of simulated particles.
