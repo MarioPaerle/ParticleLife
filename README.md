@@ -1,96 +1,152 @@
-# Simulation Lab
+# ParticleLife
 
-Simulation Lab is a free local browser collection for interactive WebGL experiments. The home page links to ParticleLife and Black Hole Lab. It runs with no build step, no paid APIs, and no network dependency after the files are loaded.
+ParticleLife is a small collection of free, local, browser-based WebGL simulations.
 
-ParticleLife is a hardware-accelerated WebGL2 particle-life simulator.
+It currently includes:
 
-The simulation stores particle positions, velocities, rule matrices, and palettes on the GPU. A fragment shader updates the ecosystem each frame, and a point-rendering shader draws glowing particles, pixel-style particles, or an ASCII-inspired view.
+- **Particle Life**: a GPU-accelerated particle ecosystem with editable rule matrices, density control, particle types, connection lines, camera movement, and visual themes.
+- **Black Hole Lab**: a realtime Schwarzschild-inspired black-hole renderer with orbit camera controls, accretion disk tuning, star fields, color palettes, mass control, and dithering modes.
 
-## Features
+Everything runs in your browser. There is no build step, no paid API, no backend, and no network dependency after the files are loaded.
 
-- GPU-accelerated particle simulation with WebGL2 floating-point textures.
-- Random rule generation.
-- Prompt-based deterministic rule generation.
-- JSON rule-matrix import through the prompt field.
-- Editable rule matrix with attraction and repulsion values.
-- Up to 50,000 particles.
-- Up to 75 particle types with a scrollable 75x75 rule matrix.
-- Adjustable simulation speed, neighbor density, interaction sample budget, interaction radius, movement randomness, friction, glow, particle size, and connection-line rendering.
-- Adjustable wrapped 2D world size.
-- Camera zoom, mouse-wheel zoom, and click-drag panning.
-- Themes: Aurora, Pixel Core, ASCII, and Void.
-- No dependencies, no bundler, no install step.
+![Black Hole Lab screenshot](assets/screenshots/black-hole-lab.png)
 
-## Run Locally
+![Particle Life screenshot](assets/screenshots/particle-life.png)
 
-From this folder:
+## What You Need
+
+You only need:
+
+- A modern browser with WebGL2 support.
+- Python 3, or any other static-file server.
+- Git, only if you want to clone the repository from GitHub.
+
+You do **not** need Node, npm, Vite, Webpack, a database, an API key, or any account.
+
+## Run It
+
+Clone the repo:
+
+```sh
+git clone https://github.com/MarioPaerle/ParticleLife.git
+cd ParticleLife
+```
+
+Start a tiny local server:
 
 ```sh
 python3 -m http.server 4173 --bind 127.0.0.1
 ```
 
-Then open the launcher:
+Open:
 
 ```text
 http://127.0.0.1:4173/
 ```
 
-Direct app links:
+The home page lets you choose between Particle Life and Black Hole Lab.
+
+Direct links:
 
 - `http://127.0.0.1:4173/particlelife.html`
 - `http://127.0.0.1:4173/blackhole.html`
 
-You can also serve it with any static-file server.
+On Windows, this command may be:
 
-## Platform Support
+```sh
+py -m http.server 4173 --bind 127.0.0.1
+```
 
-Simulation Lab is not macOS-only. It is a static browser app and should run on any operating system with a modern browser that supports WebGL2 and floating-point render targets.
+If you prefer another server, that is fine too. The project is just static files.
 
-Supported targets include:
+## Why A Local Server?
 
-- macOS with Chrome, Edge, Firefox, or recent Safari versions.
-- Windows with Chrome, Edge, or Firefox.
-- Linux with Chrome, Chromium, or Firefox.
-- Some Android browsers, depending on browser and GPU WebGL2 support.
+Opening `index.html` directly from the file system can break browser module imports on some machines. Running a local static server avoids that and behaves like normal web hosting.
 
-The local run command uses Python's built-in static server, but any static-file server works. You can host ParticleLife on GitHub Pages, Netlify, Vercel, nginx, Apache, or any equivalent static hosting service.
+## Particle Life
 
-## Controls
+Particle Life simulates many colored particles interacting through a rule matrix. Each particle has a type. The matrix decides whether one type attracts or repels another type.
 
-- `Particles`: number of simulated particles.
-- `Neighbor density`: target average number of particles inside one interaction-radius disk. Raising it packs more particles into the force neighborhood; lowering it expands the wrapped world.
-- `Types`: number of particle species.
-- `World size`: size of the wrapped 2D simulation plane.
-- `Camera zoom`: visible scale of the world.
-- `Speed`: simulation-time multiplier. Speed is integrated through fixed substeps so high speed behaves more like faster time and less like a different ODE.
-- `Interaction samples`: number of particles sampled per particle while computing forces. This keeps high particle counts responsive by approximating all-pairs forces with a rotating GPU sample set.
-- `Interaction radius`: maximum distance for pairwise forces.
-- `Motion randomness`: stochastic jitter added to particle movement.
-- `Border force`: soft wall repulsion. At `0` the world wraps toroidally; above `0` it becomes a bounded plane with no wraparound rendering, clamped camera panning, and a visible world border.
-- `Friction`: velocity damping.
-- `Glow`: visual glow intensity.
-- `Particle size`: rendered point size.
-- `Connection lines`: toggles capped particle-to-particle line rendering.
-- `Line cap`: maximum number of candidate line segments rendered per frame.
-- `Line radius`: maximum distance for a line to appear.
-- `Line opacity`: line alpha multiplier.
-- `Line width`: screen-space thickness for visible GPU-rendered connection bands.
-- `Line color mode`: blended particle colors, source particle color, or attraction/repulsion rule color.
+The simulation stores particle state on the GPU and updates it with WebGL2 shaders, so it can handle large counts while keeping the CPU mostly free.
+
+Main controls:
+
+- `Particles`: number of simulated particles, up to 50,000.
+- `Types`: number of particle species, up to 75.
+- `Rule Matrix`: editable attraction/repulsion table.
+- `Prompt or matrix`: type a prompt for deterministic generated rules, or paste a JSON matrix.
+- `Neighbor density`: target number of particles inside the interaction radius.
+- `World size`: size of the 2D plane.
+- `Camera zoom`: zoom in and out.
+- `Speed`: simulation-time multiplier using fixed substeps.
+- `Interaction samples`: GPU sample budget for approximate pairwise forces.
+- `Interaction radius`: maximum distance for forces.
+- `Motion randomness`: movement jitter.
+- `Border force`: soft wall strength. At zero, the world wraps; above zero, it becomes bounded.
+- `Connection lines`: draws capped particle-to-particle lines.
+- `Line color mode`: blend particle colors, source color, or rule color.
+
+Mouse controls:
+
 - Drag the canvas to pan.
-- Use the mouse wheel over the canvas to zoom.
+- Use the mouse wheel to zoom.
 - Use `Center View` to reset the camera.
 
 ## Black Hole Lab
 
-Open `blackhole.html` for the separate Black Hole Lab page. It does not share UI or state with ParticleLife.
+Black Hole Lab is a realtime black-hole visual sandbox. It is not an offline scientific renderer, but it uses a coherent realtime model: rays bend toward the mass, captured rays disappear into the horizon, and disk light is accumulated while the ray march crosses the accretion disk.
 
-The renderer uses a realtime Schwarzschild-inspired ray march: camera rays curve toward the mass, are captured by the horizon, and accumulate emission from a thin accretion disk. It adds horizon occlusion, a photon-ring/critical-impact cue, Doppler-style brightness asymmetry, smooth procedural star fields, selectable disk color palettes, granular hot disk particles, and lightweight Monte Carlo jitter per pixel. It is designed to stay interactive in the browser, not to replace an offline general-relativistic renderer.
+It includes:
 
-Controls include camera distance, camera yaw, camera elevation, field of view, disk density, disk color, disk size, disk particles, mass, star density, integration steps, Monte Carlo samples, exposure, dither strength, dither scale, dither levels, and dithering modes including Bayer 4x4, Dithering Boy, mono ordered, Bayer 8x8, blue-noise color, halftone mono, and scanline mono. The canvas can also be dragged to orbit the camera, and the wheel changes camera distance.
+- Horizon occlusion.
+- Photon-ring and critical-impact cues.
+- Doppler-style disk brightness asymmetry.
+- Smooth procedural stars.
+- Selectable disk color palettes.
+- Granular hot disk particles.
+- Mass control.
+- Disk size and density control.
+- Dithering modes inspired by retro and pixel tools.
 
-## Rule Matrix
+Main controls:
 
-The rule matrix is indexed as:
+- `Camera distance`: move toward or away from the black hole.
+- `Camera yaw`: orbit left/right.
+- `Camera elevation`: orbit up/down.
+- `Field of view`: widen or tighten the camera lens.
+- `Disk density`: brightness and opacity of the disk.
+- `Disk color`: choose the disk palette.
+- `Disk size`: outer radius of the accretion disk.
+- `Disk particles`: amount of hot granular disk structure.
+- `Mass`: scales the horizon, photon sphere, redshift, and bending strength.
+- `Star density`: amount of background stars.
+- `Integration steps`: ray-march quality/cost.
+- `Monte Carlo samples`: per-pixel jitter samples.
+- `Exposure`: final brightness.
+- `Dither strength`, `Dither scale`, `Dither levels`: dither look controls.
+- `Dither mode`: Off, Bayer 4x4, Dithering Boy, mono ordered, Bayer 8x8, blue noise, halftone mono, or scanline mono.
+
+Mouse controls:
+
+- Drag the canvas to orbit the camera.
+- Use the mouse wheel to change camera distance.
+
+## Platform Support
+
+This is not macOS-only.
+
+It should run on any operating system with a modern WebGL2 browser:
+
+- macOS with Chrome, Edge, Firefox, or recent Safari.
+- Windows with Chrome, Edge, or Firefox.
+- Linux with Chrome, Chromium, or Firefox.
+- Some Android browsers, depending on WebGL2 support and GPU capability.
+
+For very high particle counts, high black-hole integration steps, or high Monte Carlo samples, performance depends heavily on the GPU.
+
+## Rule Matrix Format
+
+The Particle Life rule matrix is indexed as:
 
 ```js
 matrix[actorType][neighborType]
@@ -106,9 +162,7 @@ You can paste JSON directly into the prompt field:
 [[0.2, -0.7], [0.8, -0.1]]
 ```
 
-If you type prose instead, ParticleLife hashes the prompt into a deterministic random matrix and applies local word hints such as `calm`, `orbit`, `hostile`, `galaxy`, `pixel`, and `ascii`. This is intentionally offline and free: no external model or service is called.
-
-At high type counts, the rule matrix is uploaded as a GPU texture instead of a shader uniform array. This keeps 75x75 rules practical in WebGL2.
+If you type prose instead, ParticleLife hashes the prompt into deterministic rules. The same prompt gives the same matrix.
 
 ## Project Structure
 
@@ -118,43 +172,29 @@ At high type counts, the rule matrix is uploaded as a GPU texture instead of a s
 ├── particlelife.html
 ├── blackhole.html
 ├── home.css
-├── blackhole.css
 ├── styles.css
+├── blackhole.css
 ├── assets
-│   └── fonts
-│       └── press-start-2p.ttf
+│   ├── fonts
+│   │   ├── NOTICE.md
+│   │   └── press-start-2p.ttf
+│   └── screenshots
+│       ├── black-hole-lab.png
+│       └── particle-life.png
 └── src
     ├── app.js
-    ├── black-hole-app.js
-    ├── black-hole-renderer.js
     ├── gpu-particle-life.js
-    └── rules.js
+    ├── rules.js
+    ├── black-hole-app.js
+    └── black-hole-renderer.js
 ```
 
-- `src/gpu-particle-life.js`: WebGL2 engine, GPU state textures, shaders, rendering, camera transform, and ASCII rendering.
-- `src/rules.js`: seeded randomness, prompt parsing, matrix generation, and palettes.
-- `src/app.js`: UI state, controls, theme switching, camera gestures, and matrix editor wiring.
-- `src/black-hole-renderer.js`: WebGL2 black-hole ray-march renderer and dithering shader.
-- `styles.css`, `home.css`, `blackhole.css`: black-and-white pixel UI styling.
-- `assets/fonts/press-start-2p.ttf`: self-hosted Press Start 2P font from Google Fonts, distributed under the SIL Open Font License.
+## Notes
 
-## Performance Notes
-
-Particle Life is pairwise by nature: each particle may inspect every other particle. This implementation avoids CPU bottlenecks by keeping the update loop on the GPU. For very large counts, it uses a rotating interaction sample budget to approximate all-pairs forces while keeping the browser responsive.
-
-`Neighbor density` is computed from the expected number of particles inside a particle's interaction disk:
-
-```text
-neighbor density = particle_count * pi * interaction_radius^2 / world_size^2
-```
-
-Changing neighbor density adjusts world size while keeping particle count and interaction radius visible as independent controls. Changing world size directly recalculates the displayed neighbor density.
-
-The particle slider reaches 50,000. The interaction loop is capped at 8,192 samples per particle for broad WebGL2 compatibility; use `Interaction samples` to trade accuracy for speed.
-
-Connection lines are also capped. They are sampled on the GPU, fade with distance, and are rendered as thin triangle bands instead of driver-dependent `gl.LINES`, so they remain visible while avoiding every possible pair.
-
-`Speed` does not increase the shader timestep directly. Instead, the app accumulates simulation time and advances the ODE in fixed `1/120s` substeps, capped per rendered frame. This keeps high speed more stable than a single large Euler step.
+- The UI is intentionally black and white with a pixel font.
+- The simulations themselves can be colorful.
+- The font is self-hosted so the app keeps working offline after the files are loaded.
+- `press-start-2p.ttf` is Press Start 2P from Google Fonts, distributed under the SIL Open Font License.
 
 ## License
 
