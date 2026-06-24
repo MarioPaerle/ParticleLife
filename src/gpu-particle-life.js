@@ -43,7 +43,7 @@ export class GpuParticleLife {
 
     this.updateLoc = locations(gl, this.updateProgram, [
       "uPosTex", "uVelTex", "uRuleTex", "uTexSize", "uParticleCount", "uSampleCount", "uTypeCount", "uDt",
-      "uRadius", "uNoise", "uFriction", "uFrame", "uWorldSize",
+      "uRadius", "uNoise", "uBorderForce", "uFriction", "uFrame", "uWorldSize",
     ]);
     this.renderLoc = locations(gl, this.renderProgram, [
       "uPosTex", "uColorTex", "uTexSize", "uParticleCount", "uTypeCount", "uCanvasSize", "uPointSize",
@@ -51,7 +51,7 @@ export class GpuParticleLife {
     ]);
     this.lineLoc = locations(gl, this.lineProgram, [
       "uPosTex", "uColorTex", "uRuleTex", "uTexSize", "uParticleCount", "uCanvasSize", "uWorldSize",
-      "uCamera", "uZoom", "uLineRadius", "uLineOpacity", "uLineWidth", "uLineMode", "uFrame",
+      "uCamera", "uZoom", "uLineRadius", "uLineOpacity", "uLineWidth", "uLineMode", "uBorderForce", "uFrame",
     ]);
 
     this.resize();
@@ -142,6 +142,7 @@ export class GpuParticleLife {
     gl.uniform1f(this.updateLoc.uDt, dt);
     gl.uniform1f(this.updateLoc.uRadius, state.radius);
     gl.uniform1f(this.updateLoc.uNoise, state.noise);
+    gl.uniform1f(this.updateLoc.uBorderForce, state.borderForce);
     gl.uniform1f(this.updateLoc.uFriction, state.friction);
     gl.uniform1f(this.updateLoc.uFrame, this.frame);
     gl.uniform1f(this.updateLoc.uWorldSize, state.worldSize);
@@ -217,6 +218,7 @@ export class GpuParticleLife {
     gl.uniform1f(this.lineLoc.uLineOpacity, state.lineOpacity);
     gl.uniform1f(this.lineLoc.uLineWidth, state.lineWidth);
     gl.uniform1i(this.lineLoc.uLineMode, state.lineMode);
+    gl.uniform1f(this.lineLoc.uBorderForce, state.borderForce);
     gl.uniform1f(this.lineLoc.uFrame, this.frame);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.lineVertexBuffer);
@@ -291,6 +293,7 @@ uniform int uTypeCount;
 uniform float uDt;
 uniform float uRadius;
 uniform float uNoise;
+uniform float uBorderForce;
 uniform float uFriction;
 uniform float uFrame;
 uniform float uWorldSize;
@@ -338,7 +341,9 @@ void main() {
 
     vec4 other = texture(uPosTex, texCoordForIndex(otherIndex));
     vec2 delta = other.xy - self.xy;
-    delta -= round(delta / uWorldSize) * uWorldSize;
+    if (uBorderForce <= 0.001) {
+      delta -= round(delta / uWorldSize) * uWorldSize;
+    }
     float dist = length(delta) + 0.0006;
 
     if (dist < uRadius) {
@@ -350,6 +355,15 @@ void main() {
 
   acc *= float(uParticleCount) / float(max(1, uSampleCount));
 
+  if (uBorderForce > 0.001) {
+    float wallBand = max(uRadius * 2.2, uWorldSize * 0.035);
+    float left = 1.0 - smoothstep(0.0, wallBand, self.x);
+    float right = smoothstep(uWorldSize - wallBand, uWorldSize, self.x);
+    float bottom = 1.0 - smoothstep(0.0, wallBand, self.y);
+    float top = smoothstep(uWorldSize - wallBand, uWorldSize, self.y);
+    acc += vec2(left - right, bottom - top) * uBorderForce * 1.35;
+  }
+
   vec2 jitter = vec2(
     hash(self.xy * 19.31 + uFrame),
     hash(self.yx * 23.77 - uFrame)
@@ -357,7 +371,15 @@ void main() {
 
   vel = (vel + acc * uDt * 0.075 + jitter * uNoise * uDt * 0.08) * uFriction;
   vel = clamp(vel, vec2(-0.018 * uWorldSize), vec2(0.018 * uWorldSize));
-  self.xy = mod(self.xy + vel + uWorldSize, uWorldSize);
+  vec2 nextPos = self.xy + vel;
+  if (uBorderForce > 0.001) {
+    vec2 clamped = clamp(nextPos, vec2(0.0005), vec2(uWorldSize - 0.0005));
+    vec2 hit = step(vec2(0.0001), abs(nextPos - clamped));
+    vel = mix(vel, -vel * 0.28, hit);
+    self.xy = clamped;
+  } else {
+    self.xy = mod(nextPos + uWorldSize, uWorldSize);
+  }
 
   outPos = self;
   outVel = vec4(vel, 0.0, 1.0);
@@ -444,6 +466,7 @@ uniform float uLineRadius;
 uniform float uLineOpacity;
 uniform float uLineWidth;
 uniform int uLineMode;
+uniform float uBorderForce;
 uniform float uFrame;
 out vec4 vColor;
 
@@ -472,7 +495,9 @@ void main() {
   int b = (a + 1) % count;
   vec4 pb = texture(uPosTex, texCoordForIndex(b));
   vec2 bestDelta = pb.xy - pa.xy;
-  bestDelta -= round(bestDelta / uWorldSize) * uWorldSize;
+  if (uBorderForce <= 0.001) {
+    bestDelta -= round(bestDelta / uWorldSize) * uWorldSize;
+  }
   float bestDist = length(bestDelta);
   float targetDist = uLineRadius * 0.82;
   float bestScore = abs(bestDist - targetDist) + (bestDist > uLineRadius ? uLineRadius * 4.0 : 0.0);
@@ -483,7 +508,9 @@ void main() {
     if (testIndex == a) continue;
     vec4 testParticle = texture(uPosTex, texCoordForIndex(testIndex));
     vec2 testDelta = testParticle.xy - pa.xy;
-    testDelta -= round(testDelta / uWorldSize) * uWorldSize;
+    if (uBorderForce <= 0.001) {
+      testDelta -= round(testDelta / uWorldSize) * uWorldSize;
+    }
     float testDist = length(testDelta);
     float testScore = abs(testDist - targetDist) + (testDist > uLineRadius ? uLineRadius * 4.0 : 0.0);
     if (testScore < bestScore) {

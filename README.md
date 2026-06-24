@@ -59,6 +59,7 @@ The local run command uses Python's built-in static server, but any static-file 
 - `Interaction samples`: number of particles sampled per particle while computing forces. This keeps high particle counts responsive by approximating all-pairs forces with a rotating GPU sample set.
 - `Interaction radius`: maximum distance for pairwise forces.
 - `Motion randomness`: stochastic jitter added to particle movement.
+- `Border force`: soft wall repulsion. At `0` the world wraps toroidally; above `0` the border becomes a gentle containing wall.
 - `Friction`: velocity damping.
 - `Glow`: visual glow intensity.
 - `Particle size`: rendered point size.

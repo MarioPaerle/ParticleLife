@@ -1,4 +1,4 @@
-import { GpuParticleLife } from "./gpu-particle-life.js?v=20260624f";
+import { GpuParticleLife } from "./gpu-particle-life.js?v=20260624g";
 import { clamp, makePalette, matrixFromPrompt, randomMatrix, seedFromString } from "./rules.js";
 
 const FIXED_STEP = 1 / 120;
@@ -19,6 +19,7 @@ const controls = {
   interactionSamples: document.querySelector("#interactionSamples"),
   radius: document.querySelector("#radius"),
   noise: document.querySelector("#noise"),
+  borderForce: document.querySelector("#borderForce"),
   friction: document.querySelector("#friction"),
   glow: document.querySelector("#glow"),
   size: document.querySelector("#size"),
@@ -44,6 +45,7 @@ const readouts = {
   interactionSamples: document.querySelector("#interactionSamplesValue"),
   radius: document.querySelector("#radiusValue"),
   noise: document.querySelector("#noiseValue"),
+  borderForce: document.querySelector("#borderForceValue"),
   friction: document.querySelector("#frictionValue"),
   glow: document.querySelector("#glowValue"),
   size: document.querySelector("#sizeValue"),
@@ -63,6 +65,7 @@ const state = {
   interactionSamples: Number(controls.interactionSamples.value),
   radius: Number(controls.radius.value),
   noise: Number(controls.noise.value),
+  borderForce: Number(controls.borderForce.value),
   friction: Number(controls.friction.value),
   glow: Number(controls.glow.value),
   size: Number(controls.size.value),
@@ -184,7 +187,7 @@ controls.zoom.addEventListener("input", () => {
   sim.configure(state);
 });
 
-for (const [key, digits] of [["speed", 2], ["noise", 2], ["friction", 3], ["glow", 2], ["size", 1]]) {
+for (const [key, digits] of [["speed", 2], ["noise", 2], ["borderForce", 2], ["friction", 3], ["glow", 2], ["size", 1]]) {
   controls[key].addEventListener("input", () => updateNumberControl(key, (v) => v.toFixed(digits)));
 }
 
