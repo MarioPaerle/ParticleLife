@@ -6,8 +6,6 @@ const MAX_FRAME_STEPS = 12;
 
 const canvas = document.querySelector("#glCanvas");
 const asciiCanvas = document.querySelector("#asciiCanvas");
-const blackHoleCanvas = document.querySelector("#blackHoleCanvas");
-const blackHoleCtx = blackHoleCanvas.getContext("2d");
 const worldBorder = document.querySelector("#worldBorder");
 const stage = document.querySelector(".stage");
 const body = document.body;
@@ -79,7 +77,6 @@ const state = {
   lineWidth: Number(controls.lineWidth.value),
   lineMode: Number(controls.lineMode.value),
   theme: "aurora",
-  view: "simulation",
   paused: false,
   camera: {
     x: Number(controls.worldSize.value) * 0.5,
@@ -125,9 +122,6 @@ function frame(now) {
   }
   sim.draw(state);
   updateWorldBorder();
-  if (state.view === "blackhole") {
-    drawBlackHole(now);
-  }
 
   frames += 1;
   if (now - fpsTime > 400) {
@@ -271,10 +265,6 @@ document.querySelectorAll("[data-theme]").forEach((button) => {
   button.addEventListener("click", () => applyTheme(button.dataset.theme));
 });
 
-document.querySelectorAll("[data-view]").forEach((button) => {
-  button.addEventListener("click", () => setView(button.dataset.view));
-});
-
 document.querySelector("#zoomOut").addEventListener("click", () => setZoom(state.camera.zoom / 1.35));
 document.querySelector("#zoomIn").addEventListener("click", () => setZoom(state.camera.zoom * 1.35));
 document.querySelector("#resetView").addEventListener("click", () => {
@@ -310,19 +300,7 @@ canvas.addEventListener("wheel", (event) => {
 
 window.addEventListener("resize", () => {
   sim.resize();
-  resizeBlackHoleCanvas();
 });
-
-function setView(view) {
-  state.view = view;
-  body.classList.toggle("view-blackhole", view === "blackhole");
-  document.querySelectorAll("[data-view]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.view === view);
-  });
-  if (view === "blackhole") {
-    resizeBlackHoleCanvas();
-  }
-}
 
 function applyTheme(theme) {
   state.theme = theme;
@@ -478,7 +456,7 @@ function clampAxis(value, halfView) {
 }
 
 function updateWorldBorder() {
-  if (!isBoundedWorld() || state.view !== "simulation") {
+  if (!isBoundedWorld()) {
     worldBorder.classList.remove("visible");
     return;
   }
@@ -495,55 +473,6 @@ function updateWorldBorder() {
   worldBorder.style.width = `${Math.max(0, right - left)}px`;
   worldBorder.style.height = `${Math.max(0, bottom - top)}px`;
   worldBorder.classList.add("visible");
-}
-
-function resizeBlackHoleCanvas() {
-  const rect = stage.getBoundingClientRect();
-  const ratio = window.devicePixelRatio || 1;
-  blackHoleCanvas.width = Math.max(1, Math.floor(rect.width * ratio));
-  blackHoleCanvas.height = Math.max(1, Math.floor(rect.height * ratio));
-}
-
-function drawBlackHole(now) {
-  resizeBlackHoleCanvas();
-  const w = blackHoleCanvas.width;
-  const h = blackHoleCanvas.height;
-  const cx = w * 0.5;
-  const cy = h * 0.5;
-  const scale = Math.min(w, h);
-  blackHoleCtx.clearRect(0, 0, w, h);
-  blackHoleCtx.fillStyle = "#010207";
-  blackHoleCtx.fillRect(0, 0, w, h);
-
-  const t = now * 0.00018;
-  for (let i = 0; i < 900; i += 1) {
-    const seed = i * 12.9898;
-    const lane = (i % 5) / 5;
-    const angle = seed + t * (0.8 + lane * 2.2);
-    const radius = scale * (0.18 + lane * 0.075 + ((i * 37) % 100) * 0.00055);
-    const lens = 1.0 + 0.23 * Math.sin(angle * 2.0 + lane * 9.0);
-    const x = cx + Math.cos(angle) * radius * lens;
-    const y = cy + Math.sin(angle) * radius * 0.24;
-    const heat = 0.45 + 0.55 * Math.cos(angle - t * 14.0);
-    blackHoleCtx.fillStyle = `rgba(${220 + heat * 35}, ${112 + heat * 105}, ${35 + heat * 160}, ${0.10 + heat * 0.28})`;
-    blackHoleCtx.fillRect(x, y, 2 + lane * 2.5, 1 + lane * 1.2);
-  }
-
-  const gradient = blackHoleCtx.createRadialGradient(cx, cy, scale * 0.03, cx, cy, scale * 0.27);
-  gradient.addColorStop(0, "rgba(0,0,0,1)");
-  gradient.addColorStop(0.42, "rgba(0,0,0,1)");
-  gradient.addColorStop(0.58, "rgba(45,24,80,0.82)");
-  gradient.addColorStop(0.72, "rgba(255,208,112,0.34)");
-  gradient.addColorStop(1, "rgba(72,240,200,0)");
-  blackHoleCtx.fillStyle = gradient;
-  blackHoleCtx.beginPath();
-  blackHoleCtx.arc(cx, cy, scale * 0.29, 0, Math.PI * 2);
-  blackHoleCtx.fill();
-
-  blackHoleCtx.fillStyle = "black";
-  blackHoleCtx.beginPath();
-  blackHoleCtx.arc(cx, cy, scale * 0.105, 0, Math.PI * 2);
-  blackHoleCtx.fill();
 }
 
 function themeBackground(theme) {

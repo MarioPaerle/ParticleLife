@@ -48,8 +48,7 @@ select {
 }
 
 #glCanvas,
-#asciiCanvas,
-#blackHoleCanvas {
+#asciiCanvas {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -68,23 +67,6 @@ select {
 #asciiCanvas {
   pointer-events: none;
   opacity: 0;
-}
-
-#blackHoleCanvas {
-  pointer-events: none;
-  opacity: 0;
-  background: #010207;
-}
-
-.view-blackhole #glCanvas,
-.view-blackhole #asciiCanvas,
-.view-blackhole .world-border {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.view-blackhole #blackHoleCanvas {
-  opacity: 1;
 }
 
 .world-border {
@@ -215,10 +197,6 @@ button.active {
 
 .segmented {
   grid-template-columns: repeat(4, 1fr);
-}
-
-.view-tabs {
-  grid-template-columns: repeat(2, 1fr);
 }
 
 .toolbar button,
@@ -386,15 +364,6 @@ input[type="range"] {
   --accent: #78a6ff;
   --accent-2: #ff72b6;
   --muted: #8d97b2;
-}
-
-.view-blackhole.theme-ascii #asciiCanvas,
-.view-blackhole.theme-ascii #glCanvas {
-  opacity: 0;
-}
-
-.view-blackhole.theme-ascii #blackHoleCanvas {
-  opacity: 1;
 }
 
 @media (max-width: 980px) {

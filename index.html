@@ -11,7 +11,6 @@
       <section class="stage" aria-label="Particle Life simulation">
         <canvas id="glCanvas"></canvas>
         <canvas id="asciiCanvas" aria-hidden="true"></canvas>
-        <canvas id="blackHoleCanvas" aria-hidden="true"></canvas>
         <div id="worldBorder" class="world-border" aria-hidden="true"></div>
         <div class="hud">
           <div>
@@ -34,11 +33,6 @@
           </div>
           <button id="pauseButton" class="icon-button" type="button" title="Pause or resume simulation">II</button>
         </header>
-
-        <div class="segmented view-tabs" role="group" aria-label="View">
-          <button data-view="simulation" class="active" type="button">Simulation</button>
-          <button data-view="blackhole" type="button">Black Hole</button>
-        </div>
 
         <div class="toolbar">
           <button id="randomizeRules" type="button">Random Rules</button>
@@ -163,6 +157,6 @@
       </aside>
     </main>
 
-    <script type="module" src="./src/app.js?v=20260624h"></script>
+    <script type="module" src="./src/app.js?v=20260624j"></script>
   </body>
 </html>

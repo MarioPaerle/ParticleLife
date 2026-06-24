@@ -72,7 +72,14 @@ The local run command uses Python's built-in static server, but any static-file 
 - Drag the canvas to pan.
 - Use the mouse wheel over the canvas to zoom.
 - Use `Center View` to reset the camera.
-- Use the `Black Hole` view tab to switch to a simple animated rendering sandbox for an accretion-disk/black-hole visual study.
+
+## Black Hole Lab
+
+Open `blackhole.html` for the separate Black Hole Lab page. It does not share UI or state with ParticleLife.
+
+The renderer integrates the Schwarzschild null-geodesic orbital equation in shader space for the event-horizon shadow, photon-ring neighborhood, and gravitational lensing. The accretion disk is a lightweight thin-disk emission model layered on top of the geodesic result, so it stays interactive instead of becoming a full offline GR ray tracer.
+
+Controls include camera distance, field of view, disk inclination, disk density, integration steps, exposure, and dithering modes including a posterized Dithering Boy style.
 
 ## Rule Matrix
 
