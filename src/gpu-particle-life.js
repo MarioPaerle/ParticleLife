@@ -47,7 +47,7 @@ export class GpuParticleLife {
     ]);
     this.renderLoc = locations(gl, this.renderProgram, [
       "uPosTex", "uColorTex", "uTexSize", "uParticleCount", "uTypeCount", "uCanvasSize", "uPointSize",
-      "uGlow", "uThemeMode", "uWorldSize", "uCamera", "uZoom",
+      "uGlow", "uThemeMode", "uWorldSize", "uCamera", "uZoom", "uBorderForce",
     ]);
     this.lineLoc = locations(gl, this.lineProgram, [
       "uPosTex", "uColorTex", "uRuleTex", "uTexSize", "uParticleCount", "uCanvasSize", "uWorldSize",
@@ -184,6 +184,7 @@ export class GpuParticleLife {
     gl.uniform1f(this.renderLoc.uWorldSize, state.worldSize);
     gl.uniform2f(this.renderLoc.uCamera, state.camera.x, state.camera.y);
     gl.uniform1f(this.renderLoc.uZoom, state.camera.zoom);
+    gl.uniform1f(this.renderLoc.uBorderForce, state.borderForce);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.indexBuffer);
     const loc = gl.getAttribLocation(this.renderProgram, "aIndex");
@@ -398,6 +399,7 @@ uniform float uPointSize;
 uniform float uWorldSize;
 uniform vec2 uCamera;
 uniform float uZoom;
+uniform float uBorderForce;
 out vec3 vColor;
 out float vType;
 
@@ -411,7 +413,9 @@ void main() {
   vec4 particle = texture(uPosTex, texCoordForIndex(aIndex));
   int typeIndex = int(particle.z + 0.5);
   vec2 centered = particle.xy - uCamera;
-  centered -= round(centered / uWorldSize) * uWorldSize;
+  if (uBorderForce <= 0.001) {
+    centered -= round(centered / uWorldSize) * uWorldSize;
+  }
   float aspect = uCanvasSize.x / max(1.0, uCanvasSize.y);
   float viewHeight = uWorldSize / max(0.001, uZoom);
   vec2 clip = vec2(centered.x / (viewHeight * aspect * 0.5), centered.y / (viewHeight * 0.5));
@@ -478,7 +482,9 @@ vec2 texCoordForIndex(int index) {
 
 vec2 projectWorld(vec2 world) {
   vec2 centered = world - uCamera;
-  centered -= round(centered / uWorldSize) * uWorldSize;
+  if (uBorderForce <= 0.001) {
+    centered -= round(centered / uWorldSize) * uWorldSize;
+  }
   float aspect = uCanvasSize.x / max(1.0, uCanvasSize.y);
   float viewHeight = uWorldSize / max(0.001, uZoom);
   return vec2(centered.x / (viewHeight * aspect * 0.5), centered.y / (viewHeight * 0.5));

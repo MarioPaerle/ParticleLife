@@ -59,7 +59,7 @@ The local run command uses Python's built-in static server, but any static-file 
 - `Interaction samples`: number of particles sampled per particle while computing forces. This keeps high particle counts responsive by approximating all-pairs forces with a rotating GPU sample set.
 - `Interaction radius`: maximum distance for pairwise forces.
 - `Motion randomness`: stochastic jitter added to particle movement.
-- `Border force`: soft wall repulsion. At `0` the world wraps toroidally; above `0` the border becomes a gentle containing wall.
+- `Border force`: soft wall repulsion. At `0` the world wraps toroidally; above `0` it becomes a bounded plane with no wraparound rendering, clamped camera panning, and a visible world border.
 - `Friction`: velocity damping.
 - `Glow`: visual glow intensity.
 - `Particle size`: rendered point size.
@@ -72,6 +72,7 @@ The local run command uses Python's built-in static server, but any static-file 
 - Drag the canvas to pan.
 - Use the mouse wheel over the canvas to zoom.
 - Use `Center View` to reset the camera.
+- Use the `Black Hole` view tab to switch to a simple animated rendering sandbox for an accretion-disk/black-hole visual study.
 
 ## Rule Matrix
 
