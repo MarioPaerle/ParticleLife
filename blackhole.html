@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Black Hole Lab</title>
-    <link rel="stylesheet" href="./blackhole.css?v=20260624">
+    <link rel="stylesheet" href="./blackhole.css?v=20260624q">
   </head>
   <body>
     <main class="blackhole-shell">
@@ -13,7 +13,7 @@
         <div class="hud">
           <div><span id="fps">0</span><small>fps</small></div>
           <div><span id="modelReadout">Schwarzschild</span><small>metric</small></div>
-          <div><span id="stepsReadout">96</span><small>steps</small></div>
+          <div><span id="stepsReadout">72</span><small>steps</small></div>
         </div>
       </section>
 
@@ -23,29 +23,63 @@
             <h1>Black Hole Lab</h1>
             <p>Real-time null-geodesic lensing sandbox</p>
           </div>
-          <a class="nav-link" href="./index.html">ParticleLife</a>
+          <a class="nav-link" href="./index.html">Home</a>
         </header>
 
         <div class="controls">
           <label class="control">
             <span>Camera distance <b id="cameraDistanceValue"></b></span>
-            <input id="cameraDistance" type="range" min="7" max="38" step="0.1" value="18">
+            <input id="cameraDistance" type="range" min="7" max="220" step="0.1" value="18">
+          </label>
+          <label class="control">
+            <span>Camera yaw <b id="cameraYawValue"></b></span>
+            <input id="cameraYaw" type="range" min="-180" max="180" step="1" value="0">
+          </label>
+          <label class="control">
+            <span>Camera elevation <b id="cameraPitchValue"></b></span>
+            <input id="cameraPitch" type="range" min="-86" max="86" step="1" value="12">
           </label>
           <label class="control">
             <span>Field of view <b id="fieldOfViewValue"></b></span>
             <input id="fieldOfView" type="range" min="22" max="86" step="0.5" value="48">
           </label>
           <label class="control">
-            <span>Disk inclination <b id="diskInclinationValue"></b></span>
-            <input id="diskInclination" type="range" min="0" max="82" step="1" value="68">
-          </label>
-          <label class="control">
             <span>Disk density <b id="diskDensityValue"></b></span>
             <input id="diskDensity" type="range" min="0" max="2.4" step="0.01" value="1.35">
           </label>
+          <label class="field">
+            <span>Disk color</span>
+            <select id="diskColor">
+              <option value="0">Interstellar amber</option>
+              <option value="1">White hot</option>
+              <option value="2">Blue accretion</option>
+              <option value="3">Infrared red</option>
+              <option value="4">Monochrome</option>
+            </select>
+          </label>
+          <label class="control">
+            <span>Disk size <b id="diskSizeValue"></b></span>
+            <input id="diskSize" type="range" min="4" max="32" step="0.1" value="10.8">
+          </label>
+          <label class="control">
+            <span>Disk particles <b id="diskParticlesValue"></b></span>
+            <input id="diskParticles" type="range" min="0" max="80" step="0.5" value="36">
+          </label>
+          <label class="control">
+            <span>Mass <b id="massValue"></b></span>
+            <input id="mass" type="range" min="0.55" max="3" step="0.01" value="1">
+          </label>
+          <label class="control">
+            <span>Star density <b id="starDensityValue"></b></span>
+            <input id="starDensity" type="range" min="0" max="50" step="0.1" value="50">
+          </label>
           <label class="control">
             <span>Integration steps <b id="integrationStepsValue"></b></span>
-            <input id="integrationSteps" type="range" min="32" max="192" step="8" value="96">
+            <input id="integrationSteps" type="range" min="32" max="192" step="8" value="72">
+          </label>
+          <label class="control">
+            <span>Monte Carlo samples <b id="monteCarloSamplesValue"></b></span>
+            <input id="monteCarloSamples" type="range" min="1" max="16" step="1" value="1">
           </label>
           <label class="control">
             <span>Exposure <b id="exposureValue"></b></span>
@@ -55,6 +89,14 @@
             <span>Dither strength <b id="ditherStrengthValue"></b></span>
             <input id="ditherStrength" type="range" min="0" max="1" step="0.01" value="0.22">
           </label>
+          <label class="control">
+            <span>Dither scale <b id="ditherScaleValue"></b></span>
+            <input id="ditherScale" type="range" min="1" max="8" step="1" value="1">
+          </label>
+          <label class="control">
+            <span>Dither levels <b id="ditherLevelsValue"></b></span>
+            <input id="ditherLevels" type="range" min="2" max="32" step="1" value="12">
+          </label>
           <label class="field">
             <span>Dither mode</span>
             <select id="ditherMode">
@@ -62,12 +104,16 @@
               <option value="1">Bayer 4x4</option>
               <option value="2">Dithering Boy</option>
               <option value="3">Mono ordered</option>
+              <option value="4">Bayer 8x8</option>
+              <option value="5">Blue noise</option>
+              <option value="6">Halftone mono</option>
+              <option value="7">Scanline mono</option>
             </select>
           </label>
         </div>
       </aside>
     </main>
 
-    <script type="module" src="./src/black-hole-app.js?v=20260624"></script>
+    <script type="module" src="./src/black-hole-app.js?v=20260624q"></script>
   </body>
 </html>

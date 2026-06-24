@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ParticleLife</title>
+    <link rel="stylesheet" href="./styles.css?v=20260624b">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="stage" aria-label="Particle Life simulation">
+        <canvas id="glCanvas"></canvas>
+        <canvas id="asciiCanvas" aria-hidden="true"></canvas>
+        <div id="worldBorder" class="world-border" aria-hidden="true"></div>
+        <div class="hud">
+          <div>
+            <span id="fps">0</span><small>fps</small>
+          </div>
+          <div>
+            <span id="particleReadout">0</span><small>particles</small>
+          </div>
+          <div>
+            <span id="gpuReadout">WebGL2</span><small>engine</small>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel" aria-label="Simulation controls">
+        <header class="brand">
+          <div>
+            <h1>ParticleLife</h1>
+            <p>GPU accelerated rule-matrix ecosystem</p>
+          </div>
+          <a class="nav-link" href="./index.html">Home</a>
+          <button id="pauseButton" class="icon-button" type="button" title="Pause or resume simulation">II</button>
+        </header>
+
+        <div class="toolbar">
+          <button id="randomizeRules" type="button">Random Rules</button>
+          <button id="respawnParticles" type="button">Respawn</button>
+          <button id="copyMatrix" type="button">Copy Matrix</button>
+        </div>
+
+        <label class="field">
+          <span>Prompt or matrix</span>
+          <textarea id="promptInput" spellcheck="false" placeholder="Try: neon galaxy, calm orbiting rings, hostile pixel swarm, or paste a JSON matrix like [[0.2,-0.7],[0.8,0.1]]"></textarea>
+        </label>
+        <div class="toolbar">
+          <button id="applyPrompt" type="button">Apply Prompt</button>
+          <button id="clearPrompt" type="button">Clear</button>
+        </div>
+
+        <div class="segmented" role="group" aria-label="Theme">
+          <button data-theme="aurora" class="active" type="button">Aurora</button>
+          <button data-theme="pixel" type="button">Pixel Core</button>
+          <button data-theme="ascii" type="button">ASCII</button>
+          <button data-theme="void" type="button">Void</button>
+        </div>
+
+        <div class="controls">
+          <label class="control">
+            <span>Particles <b id="particleCountValue"></b></span>
+            <input id="particleCount" type="range" min="256" max="50000" step="1" value="3072">
+          </label>
+          <label class="control">
+            <span>Neighbor density <b id="densityValue"></b></span>
+            <input id="density" type="range" min="2" max="80" step="0.5" value="18">
+          </label>
+          <label class="control">
+            <span>Types <b id="typeCountValue"></b></span>
+            <input id="typeCount" type="range" min="2" max="75" step="1" value="6">
+          </label>
+          <label class="control">
+            <span>World size <b id="worldSizeValue"></b></span>
+            <input id="worldSize" type="range" min="1" max="40" step="0.1" value="2.4">
+          </label>
+          <label class="control">
+            <span>Camera zoom <b id="zoomValue"></b></span>
+            <input id="zoom" type="range" min="0.25" max="16" step="0.05" value="1">
+          </label>
+          <label class="control">
+            <span>Speed <b id="speedValue"></b></span>
+            <input id="speed" type="range" min="0" max="8" step="0.01" value="1.2">
+          </label>
+          <label class="control">
+            <span>Interaction samples <b id="interactionSamplesValue"></b></span>
+            <input id="interactionSamples" type="range" min="512" max="8192" step="256" value="1024">
+          </label>
+          <label class="control">
+            <span>Interaction radius <b id="radiusValue"></b></span>
+            <input id="radius" type="range" min="0.02" max="0.28" step="0.002" value="0.105">
+          </label>
+          <label class="control">
+            <span>Motion randomness <b id="noiseValue"></b></span>
+            <input id="noise" type="range" min="0" max="1.4" step="0.01" value="0.08">
+          </label>
+          <label class="control">
+            <span>Border force <b id="borderForceValue"></b></span>
+            <input id="borderForce" type="range" min="0" max="2" step="0.01" value="0.28">
+          </label>
+          <label class="control">
+            <span>Friction <b id="frictionValue"></b></span>
+            <input id="friction" type="range" min="0.82" max="0.998" step="0.001" value="0.955">
+          </label>
+          <label class="control">
+            <span>Glow <b id="glowValue"></b></span>
+            <input id="glow" type="range" min="0" max="2.5" step="0.01" value="1.05">
+          </label>
+          <label class="control">
+            <span>Particle size <b id="sizeValue"></b></span>
+            <input id="size" type="range" min="1" max="8" step="0.1" value="2.6">
+          </label>
+          <label class="control toggle-control">
+            <span>Connection lines <b id="lineEnabledValue"></b></span>
+            <input id="lineEnabled" type="checkbox" checked>
+          </label>
+          <label class="control">
+            <span>Line cap <b id="lineCountValue"></b></span>
+            <input id="lineCount" type="range" min="0" max="20000" step="250" value="5000">
+          </label>
+          <label class="control">
+            <span>Line radius <b id="lineRadiusValue"></b></span>
+            <input id="lineRadius" type="range" min="0.02" max="0.5" step="0.002" value="0.32">
+          </label>
+          <label class="control">
+            <span>Line opacity <b id="lineOpacityValue"></b></span>
+            <input id="lineOpacity" type="range" min="0" max="1" step="0.01" value="0.45">
+          </label>
+          <label class="control">
+            <span>Line width <b id="lineWidthValue"></b></span>
+            <input id="lineWidth" type="range" min="0.5" max="8" step="0.1" value="1.8">
+          </label>
+          <label class="field compact-field">
+            <span>Line color mode</span>
+            <select id="lineMode">
+              <option value="0">Blend particle colors</option>
+              <option value="1">Source particle color</option>
+              <option value="2">Connection rule color</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="toolbar camera-toolbar">
+          <button id="zoomOut" type="button">Zoom -</button>
+          <button id="resetView" type="button">Center View</button>
+          <button id="zoomIn" type="button">Zoom +</button>
+        </div>
+
+        <section class="matrix-section">
+          <header>
+            <h2>Rule Matrix</h2>
+            <small>Rows attract or repel columns</small>
+          </header>
+          <div class="matrix-scroll">
+            <div id="matrixGrid" class="matrix-grid"></div>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <script type="module" src="./src/app.js?v=20260624j"></script>
+  </body>
+</html>

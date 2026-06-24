@@ -342,10 +342,11 @@ function renderMatrixEditor() {
 }
 
 function paintMatrixCell(input, value) {
-  const strength = Math.round(Math.abs(value) * 72);
-  input.style.background = value >= 0
-    ? `rgb(${20 + strength}, ${44 + strength * 2}, ${40 + strength})`
-    : `rgb(${54 + strength * 2}, ${24 + strength}, ${45 + strength})`;
+  const strength = Math.round(Math.abs(value) * 112);
+  const shade = value >= 0 ? 34 + strength : 14 + Math.round(strength * 0.55);
+  const border = value >= 0 ? 160 : 88;
+  input.style.background = `rgb(${shade}, ${shade}, ${shade})`;
+  input.style.borderColor = `rgb(${border}, ${border}, ${border})`;
 }
 
 function resizeMatrix(matrix, size) {
@@ -477,10 +478,10 @@ function updateWorldBorder() {
 
 function themeBackground(theme) {
   const backgrounds = {
-    aurora: "radial-gradient(circle at 18% 18%, rgba(72, 240, 200, 0.14), transparent 30%), radial-gradient(circle at 85% 72%, rgba(255, 119, 196, 0.13), transparent 32%), #07080b",
-    pixel: "linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), #070707",
-    ascii: "radial-gradient(circle at center, rgba(183,255,106,0.09), transparent 52%), #050805",
-    void: "radial-gradient(circle at 35% 18%, rgba(120,166,255,0.12), transparent 28%), radial-gradient(circle at 74% 78%, rgba(255,114,182,0.11), transparent 34%), #03040a",
+    aurora: "#050505",
+    pixel: "#050505",
+    ascii: "#050505",
+    void: "#020202",
   };
   return backgrounds[theme] || backgrounds.aurora;
 }

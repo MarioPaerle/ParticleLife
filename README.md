@@ -1,6 +1,8 @@
-# ParticleLife
+# Simulation Lab
 
-ParticleLife is a free, local, hardware-accelerated WebGL2 particle-life simulator. It runs entirely in the browser with no build step, no paid APIs, and no network dependency after the files are loaded.
+Simulation Lab is a free local browser collection for interactive WebGL experiments. The home page links to ParticleLife and Black Hole Lab. It runs with no build step, no paid APIs, and no network dependency after the files are loaded.
+
+ParticleLife is a hardware-accelerated WebGL2 particle-life simulator.
 
 The simulation stores particle positions, velocities, rule matrices, and palettes on the GPU. A fragment shader updates the ecosystem each frame, and a point-rendering shader draws glowing particles, pixel-style particles, or an ASCII-inspired view.
 
@@ -27,17 +29,22 @@ From this folder:
 python3 -m http.server 4173 --bind 127.0.0.1
 ```
 
-Then open:
+Then open the launcher:
 
 ```text
 http://127.0.0.1:4173/
 ```
 
+Direct app links:
+
+- `http://127.0.0.1:4173/particlelife.html`
+- `http://127.0.0.1:4173/blackhole.html`
+
 You can also serve it with any static-file server.
 
 ## Platform Support
 
-ParticleLife is not macOS-only. It is a static browser app and should run on any operating system with a modern browser that supports WebGL2 and floating-point render targets.
+Simulation Lab is not macOS-only. It is a static browser app and should run on any operating system with a modern browser that supports WebGL2 and floating-point render targets.
 
 Supported targets include:
 
@@ -77,9 +84,9 @@ The local run command uses Python's built-in static server, but any static-file 
 
 Open `blackhole.html` for the separate Black Hole Lab page. It does not share UI or state with ParticleLife.
 
-The renderer integrates the Schwarzschild null-geodesic orbital equation in shader space for the event-horizon shadow, photon-ring neighborhood, and gravitational lensing. The accretion disk is a lightweight thin-disk emission model layered on top of the geodesic result, so it stays interactive instead of becoming a full offline GR ray tracer.
+The renderer uses a realtime Schwarzschild-inspired ray march: camera rays curve toward the mass, are captured by the horizon, and accumulate emission from a thin accretion disk. It adds horizon occlusion, a photon-ring/critical-impact cue, Doppler-style brightness asymmetry, smooth procedural star fields, selectable disk color palettes, granular hot disk particles, and lightweight Monte Carlo jitter per pixel. It is designed to stay interactive in the browser, not to replace an offline general-relativistic renderer.
 
-Controls include camera distance, field of view, disk inclination, disk density, integration steps, exposure, and dithering modes including a posterized Dithering Boy style.
+Controls include camera distance, camera yaw, camera elevation, field of view, disk density, disk color, disk size, disk particles, mass, star density, integration steps, Monte Carlo samples, exposure, dither strength, dither scale, dither levels, and dithering modes including Bayer 4x4, Dithering Boy, mono ordered, Bayer 8x8, blue-noise color, halftone mono, and scanline mono. The canvas can also be dragged to orbit the camera, and the wheel changes camera distance.
 
 ## Rule Matrix
 
@@ -108,9 +115,18 @@ At high type counts, the rule matrix is uploaded as a GPU texture instead of a s
 ```text
 .
 ├── index.html
+├── particlelife.html
+├── blackhole.html
+├── home.css
+├── blackhole.css
 ├── styles.css
+├── assets
+│   └── fonts
+│       └── press-start-2p.ttf
 └── src
     ├── app.js
+    ├── black-hole-app.js
+    ├── black-hole-renderer.js
     ├── gpu-particle-life.js
     └── rules.js
 ```
@@ -118,7 +134,9 @@ At high type counts, the rule matrix is uploaded as a GPU texture instead of a s
 - `src/gpu-particle-life.js`: WebGL2 engine, GPU state textures, shaders, rendering, camera transform, and ASCII rendering.
 - `src/rules.js`: seeded randomness, prompt parsing, matrix generation, and palettes.
 - `src/app.js`: UI state, controls, theme switching, camera gestures, and matrix editor wiring.
-- `styles.css`: layout and visual themes.
+- `src/black-hole-renderer.js`: WebGL2 black-hole ray-march renderer and dithering shader.
+- `styles.css`, `home.css`, `blackhole.css`: black-and-white pixel UI styling.
+- `assets/fonts/press-start-2p.ttf`: self-hosted Press Start 2P font from Google Fonts, distributed under the SIL Open Font License.
 
 ## Performance Notes
 

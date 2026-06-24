@@ -15,8 +15,10 @@ export class BlackHoleRenderer {
     this.quad = makeBuffer(gl, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]));
     this.program = makeProgram(gl, vertexShader, fragmentShader);
     this.loc = locations(gl, this.program, [
-      "uResolution", "uTime", "uCameraDistance", "uFieldOfView", "uInclination",
-      "uDiskDensity", "uSteps", "uExposure", "uDitherStrength", "uDitherMode",
+      "uResolution", "uTime", "uCameraDistance", "uCameraYaw", "uCameraPitch",
+      "uFieldOfView", "uDiskDensity", "uDiskColor", "uDiskSize", "uDiskParticles",
+      "uMass", "uStarDensity", "uSteps", "uSamples", "uExposure", "uDitherStrength",
+      "uDitherScale", "uDitherLevels", "uDitherMode",
     ]);
   }
 
@@ -41,12 +43,21 @@ export class BlackHoleRenderer {
     gl.uniform2f(this.loc.uResolution, this.canvas.width, this.canvas.height);
     gl.uniform1f(this.loc.uTime, now * 0.001);
     gl.uniform1f(this.loc.uCameraDistance, state.cameraDistance);
+    gl.uniform1f(this.loc.uCameraYaw, state.cameraYaw);
+    gl.uniform1f(this.loc.uCameraPitch, state.cameraPitch);
     gl.uniform1f(this.loc.uFieldOfView, state.fieldOfView);
-    gl.uniform1f(this.loc.uInclination, state.diskInclination);
     gl.uniform1f(this.loc.uDiskDensity, state.diskDensity);
+    gl.uniform1i(this.loc.uDiskColor, state.diskColor);
+    gl.uniform1f(this.loc.uDiskSize, state.diskSize);
+    gl.uniform1f(this.loc.uDiskParticles, state.diskParticles);
+    gl.uniform1f(this.loc.uMass, state.mass);
+    gl.uniform1f(this.loc.uStarDensity, state.starDensity);
     gl.uniform1i(this.loc.uSteps, Math.round(state.integrationSteps));
+    gl.uniform1i(this.loc.uSamples, Math.round(state.monteCarloSamples));
     gl.uniform1f(this.loc.uExposure, state.exposure);
     gl.uniform1f(this.loc.uDitherStrength, state.ditherStrength);
+    gl.uniform1f(this.loc.uDitherScale, state.ditherScale);
+    gl.uniform1f(this.loc.uDitherLevels, state.ditherLevels);
     gl.uniform1i(this.loc.uDitherMode, state.ditherMode);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quad);
@@ -75,12 +86,21 @@ out vec4 outColor;
 uniform vec2 uResolution;
 uniform float uTime;
 uniform float uCameraDistance;
+uniform float uCameraYaw;
+uniform float uCameraPitch;
 uniform float uFieldOfView;
-uniform float uInclination;
 uniform float uDiskDensity;
+uniform int uDiskColor;
+uniform float uDiskSize;
+uniform float uDiskParticles;
+uniform float uMass;
+uniform float uStarDensity;
 uniform int uSteps;
+uniform int uSamples;
 uniform float uExposure;
 uniform float uDitherStrength;
+uniform float uDitherScale;
+uniform float uDitherLevels;
 uniform int uDitherMode;
 
 float hash(vec2 p) {
@@ -121,6 +141,19 @@ float bayer4(vec2 p) {
   return (v + 0.5) / 16.0;
 }
 
+float bayer8(vec2 p) {
+  vec2 coarse = floor(p * 0.5);
+  vec2 fine = mod(p, 2.0);
+  float base = bayer4(coarse);
+  float fineIndex = fine.x + fine.y * 2.0;
+  float add = 0.0;
+  if (fineIndex < 0.5) add = 0.0;
+  else if (fineIndex < 1.5) add = 2.0;
+  else if (fineIndex < 2.5) add = 3.0;
+  else add = 1.0;
+  return (floor(base * 16.0) * 4.0 + add + 0.5) / 64.0;
+}
+
 vec3 palette(float heat) {
   vec3 deep = vec3(0.18, 0.06, 0.018);
   vec3 amber = vec3(1.0, 0.42, 0.08);
@@ -128,136 +161,235 @@ vec3 palette(float heat) {
   return mix(mix(deep, amber, smoothstep(0.05, 0.55, heat)), white, smoothstep(0.62, 1.0, heat));
 }
 
-vec3 starField(vec2 uv, float magnification) {
-  vec2 p = uv * 72.0;
-  vec2 cell = floor(p);
-  float local = hash(cell);
-  float star = step(0.992, local) * pow(hash(cell + 4.2), 5.0);
-  float twinkle = 0.72 + 0.28 * sin(uTime * 2.0 + local * 31.0);
-  return vec3(star * twinkle * (0.14 + magnification * 0.22));
+vec3 diskPalette(float heat) {
+  vec3 base = palette(heat);
+  if (uDiskColor == 1) {
+    vec3 deep = vec3(0.12, 0.10, 0.09);
+    vec3 hot = vec3(1.0, 0.96, 0.82);
+    vec3 core = vec3(1.0);
+    return mix(mix(deep, hot, smoothstep(0.04, 0.52, heat)), core, smoothstep(0.58, 1.0, heat));
+  }
+  if (uDiskColor == 2) {
+    vec3 deep = vec3(0.015, 0.06, 0.16);
+    vec3 hot = vec3(0.20, 0.72, 1.0);
+    vec3 core = vec3(0.92, 0.98, 1.0);
+    return mix(mix(deep, hot, smoothstep(0.05, 0.56, heat)), core, smoothstep(0.60, 1.0, heat));
+  }
+  if (uDiskColor == 3) {
+    vec3 deep = vec3(0.16, 0.018, 0.006);
+    vec3 hot = vec3(1.0, 0.16, 0.05);
+    vec3 core = vec3(1.0, 0.68, 0.36);
+    return mix(mix(deep, hot, smoothstep(0.05, 0.55, heat)), core, smoothstep(0.62, 1.0, heat));
+  }
+  if (uDiskColor == 4) {
+    float mono = dot(base, vec3(0.299, 0.587, 0.114));
+    return vec3(mono);
+  }
+  return base;
 }
 
-float geodesicDeflection(float b, float rCamera, out float minR, out float whirl, out bool captured) {
-  float u = 1.0 / rCamera;
-  float invB2 = 1.0 / max(0.0001, b * b);
-  float radial = max(0.0, invB2 - u * u + 2.0 * u * u * u);
-  float du = sqrt(radial);
-  float phi = 0.0;
-  float dphi = 0.018;
-  float signDir = 1.0;
-  minR = rCamera;
-  whirl = 0.0;
-  captured = false;
+float smoothStarLayer(vec2 sky, float scale, float density, float radius, float salt) {
+  vec2 p = sky * scale + salt;
+  vec2 cell = floor(p);
+  vec2 local = fract(p);
+  vec2 offset = vec2(hash(cell + salt), hash(cell + salt + 19.73));
+  float d = length(local - offset);
+  float chance = clamp(density, 0.0, 0.96);
+  float present = step(1.0 - chance, hash(cell + salt + 83.1));
+  float core = smoothstep(radius, 0.0, d);
+  float halo = smoothstep(radius * 4.5, 0.0, d) * 0.12;
+  float brightness = pow(hash(cell + salt + 41.9), 3.2);
+  return present * brightness * (core + halo);
+}
+
+vec3 starField(vec3 dir, float magnification) {
+  vec2 sky = vec2(atan(dir.x, dir.z), asin(clamp(dir.y, -1.0, 1.0)));
+  float density = clamp(uStarDensity / 50.0, 0.0, 1.0);
+  float sparse = smoothStarLayer(sky, 20.0, density * 0.22, 0.028, 4.0);
+  float medium = smoothStarLayer(sky, 56.0, density * 0.40, 0.020, 12.0);
+  float dense = smoothStarLayer(sky, 128.0, density * 0.72, 0.012, 23.0);
+  float glow = (sparse * 1.55 + medium * 0.82 + dense * 0.32) * (0.18 + density * 1.6);
+  float milky = smoothstep(0.74, 0.99, valueNoise(sky * vec2(13.0, 23.0) + 10.0)) * density * density * 0.015;
+  vec3 cold = vec3(0.62, 0.72, 1.0);
+  vec3 warm = vec3(1.0, 0.82, 0.60);
+  vec3 tint = mix(cold, warm, hash(floor(sky * 37.0)));
+  return tint * (glow * (0.18 + magnification * 0.36) + milky);
+}
+
+float diskParticleField(vec2 disk, float r, float angle, vec2 seed) {
+  float density = clamp(uDiskParticles / 80.0, 0.0, 1.0);
+  float shear = angle * 10.0 - pow(max(r, 0.001), -0.62) * 12.0 + uTime * 1.7;
+  vec2 stream = vec2(shear, r * 1.6);
+  float fine = smoothStarLayer(stream, 16.0, density * 0.80, 0.030, 57.0 + seed.x * 0.01);
+  float hot = smoothStarLayer(stream, 34.0, density * 0.54, 0.020, 91.0 + seed.y * 0.01);
+  float sparks = smoothStarLayer(stream, 72.0, density * 0.34, 0.014, 129.0);
+  return fine * 0.35 + hot * 0.85 + sparks * 1.45;
+}
+
+vec3 diskEmission(vec3 hit, vec3 viewDir, float pass, vec2 seed, float occult) {
+  float r = length(hit.xz);
+  float angle = atan(hit.z, hit.x);
+  float mass = max(0.25, uMass);
+  float inner = 2.72 * mass;
+  float outer = max(inner + 1.2 * mass, uDiskSize);
+  float gate = smoothstep(inner, inner + 0.55 * mass, r) * (1.0 - smoothstep(outer * 0.82, outer, r));
+  if (gate <= 0.0) return vec3(0.0);
+
+  float spiral = angle * 3.5 - pow(max(r, 0.001), -0.72) * 9.0 + uTime * 0.55;
+  float turbulence = fbm(vec2(spiral + hash(seed) * 3.0, r * 0.42 - uTime * 0.12));
+  float rings = 0.82 + 0.18 * sin(r * 3.35 + turbulence * 3.2 - uTime * 1.05);
+  float clumps = smoothstep(0.24, 0.98, turbulence);
+  float particles = diskParticleField(hit.xz, r, angle, seed);
+
+  vec3 tangent = normalize(vec3(-hit.z, 0.0, hit.x));
+  float orbitalV = clamp(0.68 * sqrt(mass / max(r, inner)), 0.0, 0.62);
+  float beaming = pow(clamp(1.0 / max(0.32, 1.0 - orbitalV * dot(tangent, -viewDir)), 0.35, 2.9), 2.15);
+  float redshift = sqrt(max(0.0, 1.0 - (2.0 * mass) / max(r, 2.06 * mass)));
+  float temperature = pow(inner / max(r, inner), 0.76);
+  float secondary = pow(0.58, max(0.0, pass - 1.0));
+  float structure = mix(rings, clumps, 0.24) + particles * (0.25 + temperature * 0.55);
+  float light = gate * (0.18 + temperature * 1.75) * structure * beaming * redshift * secondary * uDiskDensity;
+  vec3 diskTone = diskPalette(clamp(light * 0.58 + particles * 0.13, 0.0, 1.0));
+  vec3 base = diskTone * light;
+  vec3 particleGlow = mix(diskTone, vec3(1.0), 0.36) * particles * gate * secondary * uDiskDensity * (0.32 + temperature * 0.75);
+  return (base + particleGlow) * occult;
+}
+
+vec3 sampleRadiance(vec2 sampleUv, vec2 seed, float sampleIndex) {
+  vec2 uv = sampleUv;
+  uv.x *= uResolution.x / max(1.0, uResolution.y);
+
+  float fov = radians(uFieldOfView);
+  float mass = max(0.25, uMass);
+  float horizon = 2.0 * mass;
+  float photonRadius = 3.0 * mass;
+  float innerDisk = 2.72 * mass;
+  float outerDisk = max(innerDisk + 1.2 * mass, uDiskSize);
+  float rCamera = max(3.2 * mass + 3.0, uCameraDistance);
+  float elevation = radians(uCameraPitch);
+  float yaw = radians(uCameraYaw);
+  vec3 camera = vec3(sin(yaw) * cos(elevation) * rCamera, sin(elevation) * rCamera, cos(yaw) * cos(elevation) * rCamera);
+  vec3 forward = normalize(-camera);
+  vec3 right = normalize(cross(forward, vec3(0.0, 1.0, 0.0)));
+  vec3 up = normalize(cross(right, forward));
+  vec3 dir = normalize(forward + (uv.x * right + uv.y * up) * tan(fov * 0.5));
+  vec3 initialDir = dir;
+  vec3 pos = camera;
+  vec3 prev = pos;
+  vec3 color = vec3(0.0);
+  float minR = 999.0;
+  float diskPass = 0.0;
+  bool captured = false;
 
   for (int i = 0; i < 192; i += 1) {
     if (i >= uSteps) break;
-    float accel = 3.0 * u * u - u;
-    du += accel * dphi * signDir;
-    u += du * dphi * signDir;
-    phi += dphi;
+    float r = length(pos);
+    minR = min(minR, r);
 
-    if (u > 0.499) {
+    if (r < horizon + 0.03 * mass) {
       captured = true;
       break;
     }
 
-    if (u > 0.0) {
-      minR = min(minR, 1.0 / u);
+    if (r > rCamera * 2.65 && dot(pos, dir) > 0.0) {
+      break;
     }
 
-    float potential = invB2 - u * u + 2.0 * u * u * u;
-    if (potential <= 0.00003 && signDir > 0.0) {
-      signDir = -1.0;
-      du = sqrt(max(0.0, potential));
-      whirl += 1.0;
-    }
+    float stepSize = clamp(r * 0.032, 0.026 * mass, 1.85);
+    stepSize *= mix(0.40, 1.0, smoothstep(photonRadius + 0.2 * mass, 24.0 * mass, r));
+    vec3 gravity = -pos / max(r, 0.0001);
+    float bend = (2.35 * mass) / max(r * r, 0.08);
+    dir = normalize(dir + gravity * bend * stepSize);
 
-    if (signDir < 0.0 && u <= 1.0 / rCamera) break;
+    prev = pos;
+    pos += dir * stepSize;
+
+    if ((prev.y > 0.0 && pos.y <= 0.0) || (prev.y < 0.0 && pos.y >= 0.0)) {
+      float t = prev.y / max(0.00001, prev.y - pos.y);
+      vec3 hit = mix(prev, pos, clamp(t, 0.0, 1.0));
+      float diskR = length(hit.xz);
+      if (diskR > innerDisk * 0.94 && diskR < outerDisk) {
+        diskPass += 1.0;
+        float nearShadow = smoothstep(horizon * 1.08, photonRadius * 1.18, minR);
+        float diskOpacity = clamp(0.18 + uDiskDensity * 0.22, 0.0, 0.78);
+        float passDim = pow(1.0 - diskOpacity, max(0.0, diskPass - 1.0));
+        float occult = nearShadow * passDim;
+        color += diskEmission(hit, dir, diskPass, seed + vec2(sampleIndex, diskPass), occult) * pow(0.72, diskPass - 1.0);
+        color *= mix(1.0, 1.0 - diskOpacity * 0.45, smoothstep(0.0, 2.0, diskPass - 1.0));
+      }
+    }
   }
 
-  return phi;
-}
+  float cosAlpha = clamp(dot(initialDir, forward), 0.0, 1.0);
+  float sinAlpha = sqrt(max(0.0, 1.0 - cosAlpha * cosAlpha));
+  float impact = rCamera * sinAlpha / sqrt(max(0.02, 1.0 - (2.0 * mass) / rCamera));
+  float criticalImpact = 5.1961524 * mass;
+  float nearCriticalImpact = exp(-pow((impact - criticalImpact) / (0.105 * mass), 2.0));
+  float photonSphere = exp(-pow((minR - photonRadius) / (0.14 * mass), 2.0));
+  float magnification = clamp((0.18 * mass) / max(0.025, abs(minR - photonRadius)), 0.0, 3.8);
+  color += starField(dir, magnification) * (captured ? 0.08 : 1.0);
+  float shadowMask = 1.0 - smoothstep(criticalImpact * 0.82, criticalImpact * 1.08, impact);
+  color *= mix(1.0, 0.014, shadowMask);
+  color += vec3(1.0, 0.78, 0.50) * max(photonSphere * 0.28, nearCriticalImpact * 0.72) * (0.055 + 0.10 * diskPass) * (captured ? 1.1 : 0.58);
 
-float diskBand(vec2 p, float height, float inner, float outer) {
-  float r = length(p);
-  float band = exp(-pow(abs(p.y) / max(0.006, height + r * 0.012), 1.22));
-  return band * smoothstep(inner, inner * 1.18, r) * (1.0 - smoothstep(outer * 0.82, outer, r));
-}
+  if (captured) {
+    color *= 0.018;
+  }
 
-float diskTexture(vec2 p, float side) {
-  float r = length(p);
-  float angle = atan(p.y, p.x);
-  float shear = angle * 6.0 + uTime * (1.1 + side * 0.45) - pow(max(0.01, r), -0.55) * 3.2;
-  float turbulence = fbm(vec2(shear, r * 13.0));
-  float rings = 0.55 + 0.45 * sin(r * 34.0 - uTime * 1.8 + turbulence * 2.0);
-  return mix(rings, turbulence, 0.62);
+  return color;
 }
 
 void main() {
-  vec2 uv = (vUv * 2.0 - 1.0);
-  uv.x *= uResolution.x / max(1.0, uResolution.y);
-
-  float fov = radians(uFieldOfView);
-  vec3 ray = normalize(vec3(uv * tan(fov * 0.5), -1.0));
-  float rCamera = max(6.2, uCameraDistance);
-  float cosAlpha = clamp(-ray.z, 0.0, 1.0);
-  float sinAlpha = sqrt(max(0.0, 1.0 - cosAlpha * cosAlpha));
-  float b = rCamera * sinAlpha / sqrt(max(0.01, 1.0 - 2.0 / rCamera));
-  float criticalB = 5.1961524;
-  float minR;
-  float whirl;
-  bool captured;
-  float phi = geodesicDeflection(b, rCamera, minR, whirl, captured);
-  float nearCritical = exp(-pow((b - criticalB) / 0.075, 2.0));
-  float magnification = clamp(0.25 / max(0.025, abs(b - criticalB)), 0.0, 4.0);
-
-  float inc = radians(uInclination);
-  float projectedY = uv.y / max(0.16, cos(inc));
-  float bend = clamp(phi - 0.55, 0.0, 5.8);
-  float lensLift = bend * 0.12 / (1.0 + length(uv) * 2.2);
-  vec2 directDisk = vec2(uv.x, projectedY);
-  vec2 topArc = vec2(uv.x, (uv.y - 0.34 + lensLift * 0.22) / max(0.16, cos(inc)));
-  vec2 bottomArc = vec2(uv.x, (uv.y + 0.27 - lensLift * 0.18) / max(0.16, cos(inc)));
-
-  float inner = 0.28;
-  float outer = 1.42;
-  float direct = diskBand(directDisk, 0.026, inner, outer) * diskTexture(directDisk, 1.0);
-  float top = diskBand(topArc, 0.020, inner * 0.82, outer * 1.02) * diskTexture(topArc, -1.0) * smoothstep(0.06, 0.64, uv.y);
-  float bottom = diskBand(bottomArc, 0.018, inner * 0.90, outer) * diskTexture(bottomArc, 1.0) * smoothstep(-0.02, -0.54, uv.y);
-
-  float angle = atan(uv.y, uv.x);
-  float doppler = 0.62 + 0.78 * smoothstep(-0.9, 0.95, cos(angle - 0.18) * sin(inc));
-  float gravitationalRedshift = sqrt(max(0.0, 1.0 - 2.0 / max(2.08, minR)));
-  float diskLight = (direct + top * 0.95 + bottom * 0.58) * uDiskDensity * doppler * gravitationalRedshift;
-  float heat = clamp(diskLight + nearCritical * 0.55, 0.0, 1.8);
-
-  vec2 skyUv = uv + normalize(uv + 0.0001) * bend * 0.13;
-  vec3 color = vec3(0.002, 0.003, 0.010);
-  color += starField(skyUv, magnification);
-  color += palette(clamp(heat, 0.0, 1.0)) * heat * 2.15;
-  color += vec3(0.95, 0.82, 0.72) * nearCritical * (0.34 + magnification * 0.08);
-  color += vec3(1.0, 0.55, 0.16) * exp(-pow((length(uv) - 0.46) / 0.10, 2.0)) * diskLight * 0.35;
-
-  if (captured) {
-    color = mix(color, vec3(0.0), 0.985);
+  vec2 baseUv = vUv * 2.0 - 1.0;
+  vec3 color = vec3(0.0);
+  int samples = clamp(uSamples, 1, 16);
+  for (int i = 0; i < 16; i += 1) {
+    if (i >= samples) break;
+    vec2 seed = gl_FragCoord.xy + vec2(float(i) * 19.19, float(i) * 71.7);
+    vec2 jitter = vec2(hash(seed), hash(seed + 31.7)) - 0.5;
+    vec2 sampleUv = baseUv + jitter * 2.0 / uResolution.xy;
+    color += sampleRadiance(sampleUv, seed, float(i));
   }
+  color /= float(samples);
   color = color / (1.0 + color * 0.48);
   color *= uExposure;
   color = pow(color, vec3(0.82));
 
   if (uDitherMode > 0) {
-    vec2 pixel = gl_FragCoord.xy;
+    vec2 pixel = floor(gl_FragCoord.xy / max(1.0, uDitherScale));
     float threshold = bayer4(pixel);
     if (uDitherMode == 1) {
       color += (threshold - 0.5) * uDitherStrength / 7.5;
     } else if (uDitherMode == 2) {
-      float levels = mix(18.0, 5.0, uDitherStrength);
+      float levels = mix(max(2.0, uDitherLevels), 3.0, uDitherStrength);
       color = floor(color * levels + threshold) / levels;
     } else {
+      if (uDitherMode == 4) {
+        float t8 = bayer8(pixel);
+        color += (t8 - 0.5) * uDitherStrength / 6.5;
+      } else if (uDitherMode == 5) {
+        float blue = hash(pixel + floor(color.rg * 37.0)) - 0.5;
+        float levels = max(2.0, uDitherLevels);
+        color = floor(color * levels + blue * uDitherStrength + 0.5) / levels;
+      } else if (uDitherMode == 6) {
+        vec2 cell = fract(pixel / 6.0) - 0.5;
+        float dotMask = smoothstep(0.42, 0.02, length(cell));
+        float mono = dot(color, vec3(0.299, 0.587, 0.114));
+        float levels = max(2.0, uDitherLevels);
+        mono = floor(mono * levels + mix(threshold, dotMask, 0.72) * uDitherStrength) / levels;
+        color = vec3(mono);
+      } else if (uDitherMode == 7) {
+        float scan = sin(pixel.y * 3.14159265) * 0.5 + 0.5;
+        float mono = dot(color, vec3(0.299, 0.587, 0.114));
+        float levels = max(2.0, uDitherLevels);
+        mono = floor(mono * levels + mix(threshold, scan, 0.55) * uDitherStrength) / levels;
+        color = vec3(mono);
+      } else {
       float mono = dot(color, vec3(0.299, 0.587, 0.114));
-      float levels = mix(24.0, 4.0, uDitherStrength);
+      float levels = mix(max(2.0, uDitherLevels), 4.0, uDitherStrength);
       mono = floor(mono * levels + threshold) / levels;
       color = vec3(mono);
+      }
     }
   }
 

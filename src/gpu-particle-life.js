@@ -254,7 +254,7 @@ export class GpuParticleLife {
     const ctx = this.ascii;
     ctx.fillStyle = "#050805";
     ctx.fillRect(0, 0, w, h);
-    ctx.font = "11px SFMono-Regular, Consolas, monospace";
+    ctx.font = "11px PressStart, monospace";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.shadowBlur = Math.round(7 * state.glow);
