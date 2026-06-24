@@ -1,4 +1,4 @@
-import { GpuParticleLife } from "./gpu-particle-life.js";
+import { GpuParticleLife } from "./gpu-particle-life.js?v=20260624f";
 import { clamp, makePalette, matrixFromPrompt, randomMatrix, seedFromString } from "./rules.js";
 
 const FIXED_STEP = 1 / 120;
@@ -26,6 +26,7 @@ const controls = {
   lineCount: document.querySelector("#lineCount"),
   lineRadius: document.querySelector("#lineRadius"),
   lineOpacity: document.querySelector("#lineOpacity"),
+  lineWidth: document.querySelector("#lineWidth"),
   lineMode: document.querySelector("#lineMode"),
   prompt: document.querySelector("#promptInput"),
 };
@@ -50,6 +51,7 @@ const readouts = {
   lineCount: document.querySelector("#lineCountValue"),
   lineRadius: document.querySelector("#lineRadiusValue"),
   lineOpacity: document.querySelector("#lineOpacityValue"),
+  lineWidth: document.querySelector("#lineWidthValue"),
 };
 
 const state = {
@@ -68,6 +70,7 @@ const state = {
   lineCount: Number(controls.lineCount.value),
   lineRadius: Number(controls.lineRadius.value),
   lineOpacity: Number(controls.lineOpacity.value),
+  lineWidth: Number(controls.lineWidth.value),
   lineMode: Number(controls.lineMode.value),
   theme: "aurora",
   paused: false,
@@ -204,7 +207,7 @@ controls.lineEnabled.addEventListener("input", () => {
   sim.configure(state);
 });
 
-for (const [key, digits] of [["lineCount", 0], ["lineRadius", 3], ["lineOpacity", 2]]) {
+for (const [key, digits] of [["lineCount", 0], ["lineRadius", 3], ["lineOpacity", 2], ["lineWidth", 1]]) {
   controls[key].addEventListener("input", () => updateNumberControl(key, (v) => digits === 0 ? String(Math.round(v)) : v.toFixed(digits)));
 }
 
@@ -360,6 +363,7 @@ function syncUi() {
   readouts.lineCount.textContent = String(state.lineCount);
   readouts.lineRadius.textContent = state.lineRadius.toFixed(3);
   readouts.lineOpacity.textContent = state.lineOpacity.toFixed(2);
+  readouts.lineWidth.textContent = state.lineWidth.toFixed(1);
 }
 
 function applyDensityToWorldSize() {

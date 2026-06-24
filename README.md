@@ -66,6 +66,7 @@ The local run command uses Python's built-in static server, but any static-file 
 - `Line cap`: maximum number of candidate line segments rendered per frame.
 - `Line radius`: maximum distance for a line to appear.
 - `Line opacity`: line alpha multiplier.
+- `Line width`: screen-space thickness for visible GPU-rendered connection bands.
 - `Line color mode`: blended particle colors, source particle color, or attraction/repulsion rule color.
 - Drag the canvas to pan.
 - Use the mouse wheel over the canvas to zoom.
@@ -124,7 +125,7 @@ Changing neighbor density adjusts world size while keeping particle count and in
 
 The particle slider reaches 50,000. The interaction loop is capped at 8,192 samples per particle for broad WebGL2 compatibility; use `Interaction samples` to trade accuracy for speed.
 
-Connection lines are also capped. They are sampled on the GPU and fade with distance, so the line layer can add structure without forcing every possible pair to be drawn.
+Connection lines are also capped. They are sampled on the GPU, fade with distance, and are rendered as thin triangle bands instead of driver-dependent `gl.LINES`, so they remain visible while avoiding every possible pair.
 
 `Speed` does not increase the shader timestep directly. Instead, the app accumulates simulation time and advances the ODE in fixed `1/120s` substeps, capped per rendered frame. This keeps high speed more stable than a single large Euler step.
 

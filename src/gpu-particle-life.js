@@ -51,7 +51,7 @@ export class GpuParticleLife {
     ]);
     this.lineLoc = locations(gl, this.lineProgram, [
       "uPosTex", "uColorTex", "uRuleTex", "uTexSize", "uParticleCount", "uCanvasSize", "uWorldSize",
-      "uCamera", "uZoom", "uLineRadius", "uLineOpacity", "uLineMode", "uFrame",
+      "uCamera", "uZoom", "uLineRadius", "uLineOpacity", "uLineWidth", "uLineMode", "uFrame",
     ]);
 
     this.resize();
@@ -170,10 +170,6 @@ export class GpuParticleLife {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 
-    if (state.lineEnabled && state.lineCount > 0) {
-      this.drawLines(state);
-    }
-
     gl.useProgram(this.renderProgram);
     bindTexture(gl, 0, this.posTex[this.flip], this.renderLoc.uPosTex);
     bindTexture(gl, 1, this.colorTex, this.renderLoc.uColorTex);
@@ -193,13 +189,18 @@ export class GpuParticleLife {
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 1, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.POINTS, 0, this.particleCount);
+
+    if (state.lineEnabled && state.lineCount > 0) {
+      this.drawLines(state);
+    }
+
     gl.disable(gl.BLEND);
   }
 
   drawLines(state) {
     const gl = this.gl;
-    const lineCount = Math.min(state.lineCount, MAX_LINE_SEGMENTS, this.particleCount);
-    if (lineCount <= 0) return;
+    const lineCount = Math.min(state.lineCount, MAX_LINE_SEGMENTS);
+    if (lineCount <= 0 || this.particleCount <= 1) return;
 
     this.ensureLineBuffer(lineCount);
     gl.useProgram(this.lineProgram);
@@ -214,6 +215,7 @@ export class GpuParticleLife {
     gl.uniform1f(this.lineLoc.uZoom, state.camera.zoom);
     gl.uniform1f(this.lineLoc.uLineRadius, state.lineRadius);
     gl.uniform1f(this.lineLoc.uLineOpacity, state.lineOpacity);
+    gl.uniform1f(this.lineLoc.uLineWidth, state.lineWidth);
     gl.uniform1i(this.lineLoc.uLineMode, state.lineMode);
     gl.uniform1f(this.lineLoc.uFrame, this.frame);
 
@@ -221,14 +223,14 @@ export class GpuParticleLife {
     const loc = gl.getAttribLocation(this.lineProgram, "aLineVertex");
     gl.enableVertexAttribArray(loc);
     gl.vertexAttribPointer(loc, 1, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.LINES, 0, lineCount * 2);
+    gl.drawArrays(gl.TRIANGLES, 0, lineCount * 6);
   }
 
   ensureLineBuffer(lineCount) {
     if (this.lineVertexBuffer && this.lineVertexCapacity >= lineCount) return;
     const gl = this.gl;
     const capacity = Math.min(MAX_LINE_SEGMENTS, Math.max(lineCount, this.lineVertexCapacity * 2 || 1024));
-    const data = new Float32Array(capacity * 2);
+    const data = new Float32Array(capacity * 6);
     for (let i = 0; i < data.length; i += 1) data[i] = i;
     this.lineVertexBuffer = makeBuffer(gl, data);
     this.lineVertexCapacity = capacity;
@@ -440,6 +442,7 @@ uniform vec2 uCamera;
 uniform float uZoom;
 uniform float uLineRadius;
 uniform float uLineOpacity;
+uniform float uLineWidth;
 uniform int uLineMode;
 uniform float uFrame;
 out vec4 vColor;
@@ -460,22 +463,42 @@ vec2 projectWorld(vec2 world) {
 
 void main() {
   int count = max(1, uParticleCount);
-  int lineIndex = int(floor(aLineVertex * 0.5));
-  bool secondEndpoint = mod(aLineVertex, 2.0) > 0.5;
+  int lineIndex = int(floor(aLineVertex / 6.0));
+  int corner = int(mod(aLineVertex, 6.0));
 
   int a = (lineIndex * 97 + int(uFrame) * 13) % count;
-  int b = (lineIndex * 193 + 17 + int(uFrame) * 29) % count;
-  if (a == b) {
-    b = (b + 1) % count;
+  vec4 pa = texture(uPosTex, texCoordForIndex(a));
+
+  int b = (a + 1) % count;
+  vec4 pb = texture(uPosTex, texCoordForIndex(b));
+  vec2 bestDelta = pb.xy - pa.xy;
+  bestDelta -= round(bestDelta / uWorldSize) * uWorldSize;
+  float bestDist = length(bestDelta);
+  float targetDist = uLineRadius * 0.82;
+  float bestScore = abs(bestDist - targetDist) + (bestDist > uLineRadius ? uLineRadius * 4.0 : 0.0);
+
+  for (int candidate = 0; candidate < 64; candidate += 1) {
+    int offset = 1 + ((lineIndex * 37 + candidate * 911 + int(uFrame) * 19) % count);
+    int testIndex = (a + offset) % count;
+    if (testIndex == a) continue;
+    vec4 testParticle = texture(uPosTex, texCoordForIndex(testIndex));
+    vec2 testDelta = testParticle.xy - pa.xy;
+    testDelta -= round(testDelta / uWorldSize) * uWorldSize;
+    float testDist = length(testDelta);
+    float testScore = abs(testDist - targetDist) + (testDist > uLineRadius ? uLineRadius * 4.0 : 0.0);
+    if (testScore < bestScore) {
+      bestScore = testScore;
+      bestDist = testDist;
+      bestDelta = testDelta;
+      b = testIndex;
+      pb = testParticle;
+    }
   }
 
-  vec4 pa = texture(uPosTex, texCoordForIndex(a));
-  vec4 pb = texture(uPosTex, texCoordForIndex(b));
-  vec2 delta = pb.xy - pa.xy;
-  delta -= round(delta / uWorldSize) * uWorldSize;
-  float dist = length(delta);
-  float strength = clamp(1.0 - dist / max(0.0001, uLineRadius), 0.0, 1.0);
-  strength = smoothstep(0.0, 1.0, strength);
+  vec2 delta = bestDelta;
+  float dist = bestDist;
+  float q = dist / max(0.0001, uLineRadius);
+  float strength = smoothstep(1.0, 0.0, q);
 
   int typeA = int(pa.z + 0.5);
   int typeB = int(pb.z + 0.5);
@@ -495,9 +518,21 @@ void main() {
     strength *= 0.35 + abs(rule) * 0.65;
   }
 
-  vec2 endpoint = secondEndpoint ? pa.xy + delta : pa.xy;
-  gl_Position = vec4(projectWorld(endpoint), 0.0, 1.0);
-  vColor = vec4(lineColor, strength * uLineOpacity);
+  float along = (corner == 0 || corner == 4 || corner == 5) ? 0.0 : 1.0;
+  float side = (corner == 0 || corner == 1 || corner == 5) ? -1.0 : 1.0;
+  vec2 clipA = projectWorld(pa.xy);
+  float aspect = uCanvasSize.x / max(1.0, uCanvasSize.y);
+  float viewHeight = uWorldSize / max(0.001, uZoom);
+  vec2 clipDelta = vec2(delta.x / (viewHeight * aspect * 0.5), delta.y / (viewHeight * 0.5));
+  vec2 clipB = clipA + clipDelta;
+  vec2 screenDelta = (clipB - clipA) * uCanvasSize;
+  vec2 direction = length(screenDelta) < 0.001 ? vec2(1.0, 0.0) : normalize(screenDelta);
+  vec2 normal = vec2(-direction.y / uCanvasSize.x, direction.x / uCanvasSize.y) * max(0.5, uLineWidth) * 2.0;
+  vec2 clip = mix(clipA, clipB, along) + normal * side;
+  gl_Position = vec4(clip, 0.0, 1.0);
+  float alpha = (dist <= uLineRadius ? 0.08 + 0.42 * strength : 0.0) * uLineOpacity;
+  vec3 boostedColor = mix(vec3(0.85), lineColor, 0.72) * (0.8 + 1.15 * strength);
+  vColor = vec4(boostedColor, alpha);
 }`;
 
 const lineFragmentShader = `#version 300 es
