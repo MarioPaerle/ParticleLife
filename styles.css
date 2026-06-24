@@ -27,7 +27,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -209,6 +210,20 @@ textarea {
   outline: none;
 }
 
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  outline: none;
+}
+
+.compact-field {
+  margin-top: 0;
+}
+
 .controls {
   display: grid;
   gap: 14px;
@@ -218,6 +233,20 @@ textarea {
 .control {
   display: grid;
   gap: 8px;
+}
+
+.toggle-control {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.toggle-control span {
+  display: flex;
+}
+
+.toggle-control input {
+  width: 20px;
+  height: 20px;
 }
 
 .control span {

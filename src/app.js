@@ -1,6 +1,9 @@
 import { GpuParticleLife } from "./gpu-particle-life.js";
 import { clamp, makePalette, matrixFromPrompt, randomMatrix, seedFromString } from "./rules.js";
 
+const FIXED_STEP = 1 / 120;
+const MAX_FRAME_STEPS = 12;
+
 const canvas = document.querySelector("#glCanvas");
 const asciiCanvas = document.querySelector("#asciiCanvas");
 const stage = document.querySelector(".stage");
@@ -8,15 +11,22 @@ const body = document.body;
 
 const controls = {
   particleCount: document.querySelector("#particleCount"),
+  density: document.querySelector("#density"),
   typeCount: document.querySelector("#typeCount"),
   worldSize: document.querySelector("#worldSize"),
   zoom: document.querySelector("#zoom"),
   speed: document.querySelector("#speed"),
+  interactionSamples: document.querySelector("#interactionSamples"),
   radius: document.querySelector("#radius"),
   noise: document.querySelector("#noise"),
   friction: document.querySelector("#friction"),
   glow: document.querySelector("#glow"),
   size: document.querySelector("#size"),
+  lineEnabled: document.querySelector("#lineEnabled"),
+  lineCount: document.querySelector("#lineCount"),
+  lineRadius: document.querySelector("#lineRadius"),
+  lineOpacity: document.querySelector("#lineOpacity"),
+  lineMode: document.querySelector("#lineMode"),
   prompt: document.querySelector("#promptInput"),
 };
 
@@ -25,27 +35,40 @@ const readouts = {
   particles: document.querySelector("#particleReadout"),
   gpu: document.querySelector("#gpuReadout"),
   particleCount: document.querySelector("#particleCountValue"),
+  density: document.querySelector("#densityValue"),
   typeCount: document.querySelector("#typeCountValue"),
   worldSize: document.querySelector("#worldSizeValue"),
   zoom: document.querySelector("#zoomValue"),
   speed: document.querySelector("#speedValue"),
+  interactionSamples: document.querySelector("#interactionSamplesValue"),
   radius: document.querySelector("#radiusValue"),
   noise: document.querySelector("#noiseValue"),
   friction: document.querySelector("#frictionValue"),
   glow: document.querySelector("#glowValue"),
   size: document.querySelector("#sizeValue"),
+  lineEnabled: document.querySelector("#lineEnabledValue"),
+  lineCount: document.querySelector("#lineCountValue"),
+  lineRadius: document.querySelector("#lineRadiusValue"),
+  lineOpacity: document.querySelector("#lineOpacityValue"),
 };
 
 const state = {
   particleCount: Number(controls.particleCount.value),
+  density: Number(controls.density.value),
   typeCount: Number(controls.typeCount.value),
   worldSize: Number(controls.worldSize.value),
   speed: Number(controls.speed.value),
+  interactionSamples: Number(controls.interactionSamples.value),
   radius: Number(controls.radius.value),
   noise: Number(controls.noise.value),
   friction: Number(controls.friction.value),
   glow: Number(controls.glow.value),
   size: Number(controls.size.value),
+  lineEnabled: controls.lineEnabled.checked,
+  lineCount: Number(controls.lineCount.value),
+  lineRadius: Number(controls.lineRadius.value),
+  lineOpacity: Number(controls.lineOpacity.value),
+  lineMode: Number(controls.lineMode.value),
   theme: "aurora",
   paused: false,
   camera: {
@@ -72,13 +95,23 @@ applyTheme("aurora");
 let lastTime = performance.now();
 let fpsTime = lastTime;
 let frames = 0;
+let physicsTime = 0;
 
 function frame(now) {
   const dt = Math.min(0.033, (now - lastTime) / 1000);
   lastTime = now;
 
   if (!state.paused) {
-    sim.step(dt, state);
+    physicsTime += dt * state.speed;
+    let steps = 0;
+    while (physicsTime >= FIXED_STEP && steps < MAX_FRAME_STEPS) {
+      sim.step(FIXED_STEP, state);
+      physicsTime -= FIXED_STEP;
+      steps += 1;
+    }
+    if (steps === MAX_FRAME_STEPS) {
+      physicsTime = Math.min(physicsTime, FIXED_STEP);
+    }
   }
   sim.draw(state);
 
@@ -100,10 +133,20 @@ function updateNumberControl(key, formatter = (value) => value) {
 
 controls.particleCount.addEventListener("input", () => {
   updateNumberControl("particleCount", (v) => String(v));
+  applyDensityToWorldSize();
 });
 controls.particleCount.addEventListener("change", () => {
   sim.randomizeParticles(state.particleCount, state.typeCount, seedFromString(`${Date.now()}-count`), state.worldSize);
   readouts.particles.textContent = state.particleCount;
+});
+
+controls.density.addEventListener("input", () => {
+  updateNumberControl("density", (v) => v.toFixed(1));
+  applyDensityToWorldSize();
+});
+controls.density.addEventListener("change", () => {
+  centerCamera();
+  sim.randomizeParticles(state.particleCount, state.typeCount, seedFromString(`${Date.now()}-density`), state.worldSize);
 });
 
 controls.typeCount.addEventListener("input", () => {
@@ -125,6 +168,7 @@ controls.worldSize.addEventListener("input", () => {
   const scale = state.worldSize / previous;
   state.camera.x = wrapWorld(state.camera.x * scale);
   state.camera.y = wrapWorld(state.camera.y * scale);
+  updateDensityFromWorldSize();
 });
 controls.worldSize.addEventListener("change", () => {
   centerCamera();
@@ -137,9 +181,37 @@ controls.zoom.addEventListener("input", () => {
   sim.configure(state);
 });
 
-for (const [key, digits] of [["speed", 2], ["radius", 3], ["noise", 2], ["friction", 3], ["glow", 2], ["size", 1]]) {
+for (const [key, digits] of [["speed", 2], ["noise", 2], ["friction", 3], ["glow", 2], ["size", 1]]) {
   controls[key].addEventListener("input", () => updateNumberControl(key, (v) => v.toFixed(digits)));
 }
+
+controls.radius.addEventListener("input", () => {
+  updateNumberControl("radius", (v) => v.toFixed(3));
+  applyDensityToWorldSize();
+});
+controls.radius.addEventListener("change", () => {
+  centerCamera();
+  sim.randomizeParticles(state.particleCount, state.typeCount, seedFromString(`${Date.now()}-radius`), state.worldSize);
+});
+
+controls.interactionSamples.addEventListener("input", () => {
+  updateNumberControl("interactionSamples", (v) => String(Math.round(v)));
+});
+
+controls.lineEnabled.addEventListener("input", () => {
+  state.lineEnabled = controls.lineEnabled.checked;
+  readouts.lineEnabled.textContent = state.lineEnabled ? "on" : "off";
+  sim.configure(state);
+});
+
+for (const [key, digits] of [["lineCount", 0], ["lineRadius", 3], ["lineOpacity", 2]]) {
+  controls[key].addEventListener("input", () => updateNumberControl(key, (v) => digits === 0 ? String(Math.round(v)) : v.toFixed(digits)));
+}
+
+controls.lineMode.addEventListener("input", () => {
+  state.lineMode = Number(controls.lineMode.value);
+  sim.configure(state);
+});
 
 document.querySelector("#pauseButton").addEventListener("click", (event) => {
   state.paused = !state.paused;
@@ -282,6 +354,35 @@ function syncUi() {
   readouts.size.textContent = state.size.toFixed(1);
   readouts.worldSize.textContent = state.worldSize.toFixed(1);
   readouts.zoom.textContent = state.camera.zoom.toFixed(2);
+  readouts.density.textContent = state.density.toFixed(1);
+  readouts.interactionSamples.textContent = String(state.interactionSamples);
+  readouts.lineEnabled.textContent = state.lineEnabled ? "on" : "off";
+  readouts.lineCount.textContent = String(state.lineCount);
+  readouts.lineRadius.textContent = state.lineRadius.toFixed(3);
+  readouts.lineOpacity.textContent = state.lineOpacity.toFixed(2);
+}
+
+function applyDensityToWorldSize() {
+  const nextWorldSize = Math.sqrt((state.particleCount * Math.PI * state.radius * state.radius) / Math.max(0.01, state.density));
+  setWorldSize(nextWorldSize);
+}
+
+function updateDensityFromWorldSize() {
+  state.density = (state.particleCount * Math.PI * state.radius * state.radius) / (state.worldSize * state.worldSize);
+  state.density = clamp(state.density, Number(controls.density.min), Number(controls.density.max));
+  controls.density.value = state.density;
+  readouts.density.textContent = state.density.toFixed(1);
+}
+
+function setWorldSize(value) {
+  const previous = state.worldSize;
+  state.worldSize = clamp(value, Number(controls.worldSize.min), Number(controls.worldSize.max));
+  controls.worldSize.value = state.worldSize;
+  readouts.worldSize.textContent = state.worldSize.toFixed(1);
+  const scale = state.worldSize / previous;
+  state.camera.x = wrapWorld(state.camera.x * scale);
+  state.camera.y = wrapWorld(state.camera.y * scale);
+  sim.configure(state);
 }
 
 function setZoom(value) {

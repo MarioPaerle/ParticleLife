@@ -1,6 +1,8 @@
 import { mulberry32 } from "./rules.js";
 
-const MAX_TYPES = 50;
+const MAX_TYPES = 75;
+const MAX_INTERACTION_SAMPLES = 8192;
+const MAX_LINE_SEGMENTS = 20000;
 
 // GpuParticleLife uses the classic "ping-pong texture" pattern:
 // 1. Particle state is stored in floating point textures, not JavaScript arrays.
@@ -31,18 +33,25 @@ export class GpuParticleLife {
     this.frame = 0;
     this.ruleTex = null;
     this.colorTex = null;
+    this.lineVertexBuffer = null;
+    this.lineVertexCapacity = 0;
 
     this.quad = makeBuffer(gl, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]));
     this.updateProgram = makeProgram(gl, updateVertexShader, updateFragmentShader);
     this.renderProgram = makeProgram(gl, renderVertexShader, renderFragmentShader);
+    this.lineProgram = makeProgram(gl, lineVertexShader, lineFragmentShader);
 
     this.updateLoc = locations(gl, this.updateProgram, [
-      "uPosTex", "uVelTex", "uRuleTex", "uTexSize", "uParticleCount", "uTypeCount", "uDt", "uSpeed",
+      "uPosTex", "uVelTex", "uRuleTex", "uTexSize", "uParticleCount", "uSampleCount", "uTypeCount", "uDt",
       "uRadius", "uNoise", "uFriction", "uFrame", "uWorldSize",
     ]);
     this.renderLoc = locations(gl, this.renderProgram, [
       "uPosTex", "uColorTex", "uTexSize", "uParticleCount", "uTypeCount", "uCanvasSize", "uPointSize",
       "uGlow", "uThemeMode", "uWorldSize", "uCamera", "uZoom",
+    ]);
+    this.lineLoc = locations(gl, this.lineProgram, [
+      "uPosTex", "uColorTex", "uRuleTex", "uTexSize", "uParticleCount", "uCanvasSize", "uWorldSize",
+      "uCamera", "uZoom", "uLineRadius", "uLineOpacity", "uLineMode", "uFrame",
     ]);
 
     this.resize();
@@ -89,12 +98,14 @@ export class GpuParticleLife {
   uploadRuleTexture(matrix) {
     const gl = this.gl;
     const data = flattenRules(matrix);
+    if (this.ruleTex) gl.deleteTexture(this.ruleTex);
     this.ruleTex = dataTexture(gl, MAX_TYPES, MAX_TYPES, data);
   }
 
   uploadColorTexture(colors) {
     const gl = this.gl;
     const data = flattenColors(colors);
+    if (this.colorTex) gl.deleteTexture(this.colorTex);
     this.colorTex = dataTexture(gl, MAX_TYPES, 1, data);
   }
 
@@ -126,9 +137,9 @@ export class GpuParticleLife {
     bindTexture(gl, 2, this.ruleTex, this.updateLoc.uRuleTex);
     gl.uniform1f(this.updateLoc.uTexSize, this.texSize);
     gl.uniform1i(this.updateLoc.uParticleCount, this.particleCount);
+    gl.uniform1i(this.updateLoc.uSampleCount, Math.min(this.particleCount, state.interactionSamples, MAX_INTERACTION_SAMPLES));
     gl.uniform1i(this.updateLoc.uTypeCount, state.typeCount);
     gl.uniform1f(this.updateLoc.uDt, dt);
-    gl.uniform1f(this.updateLoc.uSpeed, state.speed);
     gl.uniform1f(this.updateLoc.uRadius, state.radius);
     gl.uniform1f(this.updateLoc.uNoise, state.noise);
     gl.uniform1f(this.updateLoc.uFriction, state.friction);
@@ -159,6 +170,10 @@ export class GpuParticleLife {
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 
+    if (state.lineEnabled && state.lineCount > 0) {
+      this.drawLines(state);
+    }
+
     gl.useProgram(this.renderProgram);
     bindTexture(gl, 0, this.posTex[this.flip], this.renderLoc.uPosTex);
     bindTexture(gl, 1, this.colorTex, this.renderLoc.uColorTex);
@@ -179,6 +194,44 @@ export class GpuParticleLife {
     gl.vertexAttribPointer(loc, 1, gl.FLOAT, false, 0, 0);
     gl.drawArrays(gl.POINTS, 0, this.particleCount);
     gl.disable(gl.BLEND);
+  }
+
+  drawLines(state) {
+    const gl = this.gl;
+    const lineCount = Math.min(state.lineCount, MAX_LINE_SEGMENTS, this.particleCount);
+    if (lineCount <= 0) return;
+
+    this.ensureLineBuffer(lineCount);
+    gl.useProgram(this.lineProgram);
+    bindTexture(gl, 0, this.posTex[this.flip], this.lineLoc.uPosTex);
+    bindTexture(gl, 1, this.colorTex, this.lineLoc.uColorTex);
+    bindTexture(gl, 2, this.ruleTex, this.lineLoc.uRuleTex);
+    gl.uniform1f(this.lineLoc.uTexSize, this.texSize);
+    gl.uniform1i(this.lineLoc.uParticleCount, this.particleCount);
+    gl.uniform2f(this.lineLoc.uCanvasSize, this.canvas.width, this.canvas.height);
+    gl.uniform1f(this.lineLoc.uWorldSize, state.worldSize);
+    gl.uniform2f(this.lineLoc.uCamera, state.camera.x, state.camera.y);
+    gl.uniform1f(this.lineLoc.uZoom, state.camera.zoom);
+    gl.uniform1f(this.lineLoc.uLineRadius, state.lineRadius);
+    gl.uniform1f(this.lineLoc.uLineOpacity, state.lineOpacity);
+    gl.uniform1i(this.lineLoc.uLineMode, state.lineMode);
+    gl.uniform1f(this.lineLoc.uFrame, this.frame);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.lineVertexBuffer);
+    const loc = gl.getAttribLocation(this.lineProgram, "aLineVertex");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 1, gl.FLOAT, false, 0, 0);
+    gl.drawArrays(gl.LINES, 0, lineCount * 2);
+  }
+
+  ensureLineBuffer(lineCount) {
+    if (this.lineVertexBuffer && this.lineVertexCapacity >= lineCount) return;
+    const gl = this.gl;
+    const capacity = Math.min(MAX_LINE_SEGMENTS, Math.max(lineCount, this.lineVertexCapacity * 2 || 1024));
+    const data = new Float32Array(capacity * 2);
+    for (let i = 0; i < data.length; i += 1) data[i] = i;
+    this.lineVertexBuffer = makeBuffer(gl, data);
+    this.lineVertexCapacity = capacity;
   }
 
   drawAscii(state) {
@@ -231,9 +284,9 @@ uniform sampler2D uVelTex;
 uniform sampler2D uRuleTex;
 uniform float uTexSize;
 uniform int uParticleCount;
+uniform int uSampleCount;
 uniform int uTypeCount;
 uniform float uDt;
-uniform float uSpeed;
 uniform float uRadius;
 uniform float uNoise;
 uniform float uFriction;
@@ -273,8 +326,12 @@ void main() {
   vec2 acc = vec2(0.0);
   int selfType = int(self.z + 0.5);
 
-  for (int otherIndex = 0; otherIndex < 8192; otherIndex += 1) {
-    if (otherIndex >= uParticleCount) break;
+  int frameOffset = int(mod(uFrame, float(max(1, uParticleCount))));
+  int stride = max(1, uParticleCount / max(1, uSampleCount));
+
+  for (int sampleIndex = 0; sampleIndex < 8192; sampleIndex += 1) {
+    if (sampleIndex >= uSampleCount) break;
+    int otherIndex = (selfIndex + frameOffset + sampleIndex * stride) % uParticleCount;
     if (otherIndex == selfIndex) continue;
 
     vec4 other = texture(uPosTex, texCoordForIndex(otherIndex));
@@ -289,14 +346,16 @@ void main() {
     }
   }
 
+  acc *= float(uParticleCount) / float(max(1, uSampleCount));
+
   vec2 jitter = vec2(
     hash(self.xy * 19.31 + uFrame),
     hash(self.yx * 23.77 - uFrame)
   ) - 0.5;
 
-  vel = (vel + acc * uDt * uSpeed * 0.075 + jitter * uNoise * uDt * 0.08) * uFriction;
+  vel = (vel + acc * uDt * 0.075 + jitter * uNoise * uDt * 0.08) * uFriction;
   vel = clamp(vel, vec2(-0.018 * uWorldSize), vec2(0.018 * uWorldSize));
-  self.xy = mod(self.xy + vel * uSpeed + uWorldSize, uWorldSize);
+  self.xy = mod(self.xy + vel + uWorldSize, uWorldSize);
 
   outPos = self;
   outVel = vec4(vel, 0.0, 1.0);
@@ -365,6 +424,90 @@ void main() {
   if (alpha < 0.01) discard;
   vec3 color = vColor * (0.55 + core * 1.8 + halo * uGlow);
   outColor = vec4(color, alpha);
+}`;
+
+const lineVertexShader = `#version 300 es
+precision highp float;
+in float aLineVertex;
+uniform sampler2D uPosTex;
+uniform sampler2D uColorTex;
+uniform sampler2D uRuleTex;
+uniform float uTexSize;
+uniform int uParticleCount;
+uniform vec2 uCanvasSize;
+uniform float uWorldSize;
+uniform vec2 uCamera;
+uniform float uZoom;
+uniform float uLineRadius;
+uniform float uLineOpacity;
+uniform int uLineMode;
+uniform float uFrame;
+out vec4 vColor;
+
+vec2 texCoordForIndex(int index) {
+  float x = mod(float(index), uTexSize);
+  float y = floor(float(index) / uTexSize);
+  return (vec2(x, y) + 0.5) / uTexSize;
+}
+
+vec2 projectWorld(vec2 world) {
+  vec2 centered = world - uCamera;
+  centered -= round(centered / uWorldSize) * uWorldSize;
+  float aspect = uCanvasSize.x / max(1.0, uCanvasSize.y);
+  float viewHeight = uWorldSize / max(0.001, uZoom);
+  return vec2(centered.x / (viewHeight * aspect * 0.5), centered.y / (viewHeight * 0.5));
+}
+
+void main() {
+  int count = max(1, uParticleCount);
+  int lineIndex = int(floor(aLineVertex * 0.5));
+  bool secondEndpoint = mod(aLineVertex, 2.0) > 0.5;
+
+  int a = (lineIndex * 97 + int(uFrame) * 13) % count;
+  int b = (lineIndex * 193 + 17 + int(uFrame) * 29) % count;
+  if (a == b) {
+    b = (b + 1) % count;
+  }
+
+  vec4 pa = texture(uPosTex, texCoordForIndex(a));
+  vec4 pb = texture(uPosTex, texCoordForIndex(b));
+  vec2 delta = pb.xy - pa.xy;
+  delta -= round(delta / uWorldSize) * uWorldSize;
+  float dist = length(delta);
+  float strength = clamp(1.0 - dist / max(0.0001, uLineRadius), 0.0, 1.0);
+  strength = smoothstep(0.0, 1.0, strength);
+
+  int typeA = int(pa.z + 0.5);
+  int typeB = int(pb.z + 0.5);
+  vec3 colorA = texelFetch(uColorTex, ivec2(typeA, 0), 0).rgb;
+  vec3 colorB = texelFetch(uColorTex, ivec2(typeB, 0), 0).rgb;
+  float ruleAB = texelFetch(uRuleTex, ivec2(typeB, typeA), 0).r;
+  float ruleBA = texelFetch(uRuleTex, ivec2(typeA, typeB), 0).r;
+  float rule = (ruleAB + ruleBA) * 0.5;
+
+  vec3 lineColor = mix(colorA, colorB, 0.5);
+  if (uLineMode == 1) {
+    lineColor = colorA;
+  } else if (uLineMode == 2) {
+    vec3 attract = vec3(0.25, 1.0, 0.78);
+    vec3 repel = vec3(1.0, 0.24, 0.55);
+    lineColor = mix(repel, attract, smoothstep(-1.0, 1.0, rule));
+    strength *= 0.35 + abs(rule) * 0.65;
+  }
+
+  vec2 endpoint = secondEndpoint ? pa.xy + delta : pa.xy;
+  gl_Position = vec4(projectWorld(endpoint), 0.0, 1.0);
+  vColor = vec4(lineColor, strength * uLineOpacity);
+}`;
+
+const lineFragmentShader = `#version 300 es
+precision highp float;
+in vec4 vColor;
+out vec4 outColor;
+
+void main() {
+  if (vColor.a <= 0.001) discard;
+  outColor = vColor;
 }`;
 
 function makeProgram(gl, vertexSource, fragmentSource) {

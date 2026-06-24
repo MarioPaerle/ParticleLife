@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>ParticleLife</title>
-    <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./styles.css?v=20260624">
   </head>
   <body>
     <main class="app-shell">
@@ -58,15 +58,19 @@
         <div class="controls">
           <label class="control">
             <span>Particles <b id="particleCountValue"></b></span>
-            <input id="particleCount" type="range" min="256" max="8192" step="128" value="3072">
+            <input id="particleCount" type="range" min="256" max="50000" step="1" value="3072">
+          </label>
+          <label class="control">
+            <span>Neighbor density <b id="densityValue"></b></span>
+            <input id="density" type="range" min="2" max="80" step="0.5" value="18">
           </label>
           <label class="control">
             <span>Types <b id="typeCountValue"></b></span>
-            <input id="typeCount" type="range" min="2" max="50" step="1" value="6">
+            <input id="typeCount" type="range" min="2" max="75" step="1" value="6">
           </label>
           <label class="control">
             <span>World size <b id="worldSizeValue"></b></span>
-            <input id="worldSize" type="range" min="1" max="12" step="0.1" value="2.4">
+            <input id="worldSize" type="range" min="1" max="40" step="0.1" value="2.4">
           </label>
           <label class="control">
             <span>Camera zoom <b id="zoomValue"></b></span>
@@ -74,7 +78,11 @@
           </label>
           <label class="control">
             <span>Speed <b id="speedValue"></b></span>
-            <input id="speed" type="range" min="0" max="4" step="0.01" value="1.2">
+            <input id="speed" type="range" min="0" max="8" step="0.01" value="1.2">
+          </label>
+          <label class="control">
+            <span>Interaction samples <b id="interactionSamplesValue"></b></span>
+            <input id="interactionSamples" type="range" min="512" max="8192" step="256" value="1024">
           </label>
           <label class="control">
             <span>Interaction radius <b id="radiusValue"></b></span>
@@ -96,6 +104,30 @@
             <span>Particle size <b id="sizeValue"></b></span>
             <input id="size" type="range" min="1" max="8" step="0.1" value="2.6">
           </label>
+          <label class="control toggle-control">
+            <span>Connection lines <b id="lineEnabledValue"></b></span>
+            <input id="lineEnabled" type="checkbox" checked>
+          </label>
+          <label class="control">
+            <span>Line cap <b id="lineCountValue"></b></span>
+            <input id="lineCount" type="range" min="0" max="20000" step="250" value="5000">
+          </label>
+          <label class="control">
+            <span>Line radius <b id="lineRadiusValue"></b></span>
+            <input id="lineRadius" type="range" min="0.02" max="0.5" step="0.002" value="0.14">
+          </label>
+          <label class="control">
+            <span>Line opacity <b id="lineOpacityValue"></b></span>
+            <input id="lineOpacity" type="range" min="0" max="1" step="0.01" value="0.35">
+          </label>
+          <label class="field compact-field">
+            <span>Line color mode</span>
+            <select id="lineMode">
+              <option value="0">Blend particle colors</option>
+              <option value="1">Source particle color</option>
+              <option value="2">Connection rule color</option>
+            </select>
+          </label>
         </div>
 
         <div class="toolbar camera-toolbar">
@@ -116,6 +148,6 @@
       </aside>
     </main>
 
-    <script type="module" src="./src/app.js"></script>
+    <script type="module" src="./src/app.js?v=20260624"></script>
   </body>
 </html>
